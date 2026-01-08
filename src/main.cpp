@@ -1,10 +1,13 @@
-#include <PubSubClient.h>
-#include <WiFiClientSecure.h>
-#include <WiFi.h>
+#include <Arduino.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/queue.h>
+#include <freertos/event_groups.h>
 #include "config.h"
+#include "types.h"
 //https://www.hivemq.com/demos/websocket-client/
 
-/*config.h file example (fill with passowords):
+/*config.h file example (fill with passowords and configurations):
 // --- CREDENTIALS---
 #define WIFI_SSID       "YOUR_WIFI_SSID"
 #define WIFI_PASS       "YOUR_WIFI_PASSWORD"
@@ -18,103 +21,122 @@
 // Topics
 #define TOPIC_PUB       "garden/mangos/status"
 #define TOPIC_CMD       "garden/cmd/capture"
+
+// --- PINS ---
+#define PIN_SR_DATA     47
+#define PIN_SR_CLOCK    48
+#define PIN_SR_LATCH    14
+#define PIN_I2C_SDA     41
+#define PIN_I2C_SCL     42
+#define PIN_ANALOG_IN   1 
+
+// --- SYSTEM ---
+#define DEEP_SLEEP_SEC  10
+
 */
 
-WiFiClientSecure espClient; //ESP32
+// --- GLOBALS ---
+QueueHandle_t dataQueue;
+EventGroupHandle_t syncBits;
+#define BIT_COMMS_DONE (1 << 0)
 
-PubSubClient client(espClient);
-const int ledPin = 14; // LED integrato
-// --- GESTIONE MESSAGGI IN ARRIVO (CALLBACK) ---
-void callback(char* topic, byte* payload, unsigned int length) {
-  Serial.print("Messaggio arrivato [");
-  Serial.print(topic);
-  Serial.print("]: ");
-
-  // Trasformiamo il payload in stringa per leggerlo meglio
-  String message;
-  for (int i = 0; i < length; i++) {
-    message += (char)payload[i];
-  }
-  Serial.println(message);
-
-  // LOGICA SEMPLICE DI COMANDO
-  if (message == "ON") {
-    digitalWrite(ledPin, HIGH); // Accendi
-    Serial.println("LED ACCESO");
-  } else if (message == "OFF") {
-    digitalWrite(ledPin, LOW);  // Spegni
-    Serial.println("LED SPENTO");
-  }
-}
-
-void setup() {
-  pinMode(ledPin, OUTPUT);
-  Serial.begin(115200);
-
-  //per adesso non chiediamo il certificato al server
-  espClient.setInsecure();
-
-  // Connessione WiFi
-  Serial.print("Connessione WiFi...");
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println(" Connesso!");
-
-  // Configura MQTT
-  client.setServer(MQTT_BROKER, MQTT_PORT); // Porta standard non criptata
-  client.setCallback(callback);        // Chi chiamare quando arriva un messaggio
-}
-
-void reconnect() {
-  // Loop finché non siamo connessi
-  while (!client.connected()) {
-    Serial.print("Tentativo connessione MQTT...");
-    // Crea un ID client random
-    String clientId = "ESP32Client-Min414";
-    //clientId += String(random(0xffff), HEX);
-    
-
-  if (client.connect(clientId.c_str(), MQTT_USER, MQTT_PASS)) {
-      Serial.print("Connesso con id:");
-      Serial.println(clientId);
-      // Appena connesso, mi iscrivo al topic dei comandi
-      client.subscribe(TOPIC_CMD);
-    } else {
-      Serial.print("Fallito, rc=");
-      Serial.print(client.state());
-      Serial.println(" riprovo tra 5 secondi");
-      delay(5000);
+// --- SIMULATED HARDWARE DRIVER ---
+// In real life, this shifts bits. Here, it just prints.
+void updateSR(uint8_t data) {
+    // Simulation: Visualizing the byte
+    Serial.print("[HW SIM] Shift Register Update: 0b");
+    for (int i = 7; i >= 0; i--) {
+        Serial.print((data >> i) & 1);
     }
-  }
+    Serial.println();
+    
+    // Physical Write (Safe to leave even without hardware connected)
+    digitalWrite(PIN_SR_LATCH, LOW);
+    shiftOut(PIN_SR_DATA, PIN_SR_CLOCK, MSBFIRST, data);
+    digitalWrite(PIN_SR_LATCH, HIGH);
 }
 
-long lastMsg = 0;
+// Forward Declaration
+void taskComms(void *pvParameters);
 
-void loop() {
-  if (!client.connected()) {
-    reconnect();
-  }
-  client.loop(); // Fondamentale: controlla se ci sono messaggi in arrivo!
+// --- TASK A: MAIN LOGIC (The Brain) ---
+void taskMain(void *pvParameters) {
+    Serial.println("[MAIN] Logic Started. Reading Sensors...");
+    GardenMessage msg;
 
-  // Invia temperatura ogni 5 secondi (senza bloccare con delay lunghi)
-  long now = millis();
-  if (now - lastMsg > 5000) {
-    lastMsg = now;
+    // 1. SIMULATE SENSORS (Replace with AHT20/ADC later)
+    msg.temp = 20.0 + (random(0, 150) / 10.0);   // 20.0 - 35.0 C
+    msg.hum = 40.0 + (random(0, 400) / 10.0);    // 40% - 80%
+    msg.moisture = random(30, 90);               // 30% - 90%
+    msg.waterOk = true;
+    msg.battery = 4.15;
+    msg.rst = "pwr"; // Hardcoded for now
+    msg.errCode = 0;
+    msg.cmdPhotoReq = false; // Default
+
+    // 2. LOGIC DECISION (The Overlord Logic)
+    // "If Temp < 22C, Turn ON Heater (Bit 2)"
+    uint8_t actuatorState = 0;
+
+    if (msg.temp < 22.0) {
+        Serial.printf("[MAIN] Temp %.1f is Low! HEATER ON.\n", msg.temp);
+        actuatorState |= (1 << 2); // Set Bit 2 (Heater)
+    } else {
+        Serial.printf("[MAIN] Temp %.1f is OK.\n", msg.temp);
+    }
+
+    // "If Moisture < 40%, Turn ON Pump (Bit 0)"
+    if (msg.moisture < 40) {
+        Serial.printf("[MAIN] Moisture %d%% is Low! PUMP ON.\n", msg.moisture);
+        actuatorState |= (1 << 0); // Set Bit 0 (Pump)
+    }
+
+    // 3. ACTUATE
+    msg.actState = actuatorState;
+    updateSR(actuatorState);
+
+    // 4. WAIT (Simulate working time)
+    // If heaters were on, we'd stay awake here.
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    // 5. TURN OFF ACTUATORS (Before Sleep)
+    updateSR(0x00);
+
+    // 6. HANDOFF TO COMMS
+    Serial.println("[MAIN] Sending data to Queue...");
+    xQueueSend(dataQueue, &msg, portMAX_DELAY);
     
-    // Simula temperatura tra 20 e 30 gradi
-    float temp = 20.0 + (random(100) / 10.0);
-    
-    // Converti float in stringa
-    char tempString[8];
-    dtostrf(temp, 1, 2, tempString);
-    
-    Serial.print("Invio temperatura: ");
-    Serial.println(tempString);
-    
-    // PUBBLICA
-    client.publish(TOPIC_PUB, tempString);
-  }
+    Serial.println("[MAIN] Retire.");
+    vTaskDelete(NULL);
 }
+
+// --- SETUP (The Orchestrator) ---
+void setup() {
+    Serial.begin(115200);
+    delay(1000); 
+    Serial.println("\n--- SYSTEM WAKE ---");
+
+    // Init Pins
+    pinMode(PIN_SR_DATA, OUTPUT);
+    pinMode(PIN_SR_CLOCK, OUTPUT);
+    pinMode(PIN_SR_LATCH, OUTPUT);
+    
+    // Create RTOS Objects
+    dataQueue = xQueueCreate(5, sizeof(GardenMessage));
+    syncBits = xEventGroupCreate();
+
+    // Spawn Workers
+    xTaskCreatePinnedToCore(taskMain,  "Main",  4096, NULL, 1, NULL, 1);
+    xTaskCreatePinnedToCore(taskComms, "Comms", 4096, NULL, 1, NULL, 0);
+
+    // Wait for "Job Done" signal
+    Serial.println("[SETUP] Waiting for Comms...");
+    xEventGroupWaitBits(syncBits, BIT_COMMS_DONE, pdFALSE, pdTRUE, pdMS_TO_TICKS(15000));
+
+    Serial.println("[SETUP] Sleep time.");
+    Serial.flush();
+    esp_sleep_enable_timer_wakeup(DEEP_SLEEP_SEC * 1000000ULL);
+    esp_deep_sleep_start();
+}
+
+void loop() { /* Dead */ }
