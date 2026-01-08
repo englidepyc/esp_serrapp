@@ -4,18 +4,20 @@
 #include "config.h"
 //https://www.hivemq.com/demos/websocket-client/
 
-/*config.h file example (fill with your passowords):
-// --- CONFIGURAZIONE WIFI ---
-const char* ssid = "your-wifi-ssid"
-const char* password = "your-wifi-password"
+/*config.h file example (fill with passowords):
+// --- CREDENTIALS---
+#define WIFI_SSID       "YOUR_WIFI_SSID"
+#define WIFI_PASS       "YOUR_WIFI_PASSWORD"
 
-// --- CONFIGURAZIONE MQTT (Broker Pubblico) ---
-const char* mqtt_server = "your-mqtt-server"
-int mqtt_port = 8883; //1883 unencrypted
-const char* userId = "your-user-id"
-const char* userPassword = "your-user-password"
-const char* topic_sub = "topic/path"; 
-const char* topic_pub = "topic/path";
+// MQTT Configuration
+#define MQTT_BROKER     "YOUR_MQTT_SERVER" 
+#define MQTT_PORT       8883             // SSL Port
+#define MQTT_USER       "YOUR_USER_ID"   // Keep empty if public broker
+#define MQTT_PASS       "YOUR_PASSWORD"  // Keep empty if public broker
+
+// Topics
+#define TOPIC_PUB       "garden/mangos/status"
+#define TOPIC_CMD       "garden/cmd/capture"
 */
 
 WiFiClientSecure espClient; //ESP32
@@ -54,7 +56,7 @@ void setup() {
 
   // Connessione WiFi
   Serial.print("Connessione WiFi...");
-  WiFi.begin(ssid, password);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -62,7 +64,7 @@ void setup() {
   Serial.println(" Connesso!");
 
   // Configura MQTT
-  client.setServer(mqtt_server, mqtt_port); // Porta standard non criptata
+  client.setServer(MQTT_BROKER, MQTT_PORT); // Porta standard non criptata
   client.setCallback(callback);        // Chi chiamare quando arriva un messaggio
 }
 
@@ -75,11 +77,11 @@ void reconnect() {
     //clientId += String(random(0xffff), HEX);
     
 
-    if (client.connect(clientId.c_str(), userId, userPassword)) {
+  if (client.connect(clientId.c_str(), MQTT_USER, MQTT_PASS)) {
       Serial.print("Connesso con id:");
       Serial.println(clientId);
       // Appena connesso, mi iscrivo al topic dei comandi
-      client.subscribe(topic_sub);
+      client.subscribe(TOPIC_CMD);
     } else {
       Serial.print("Fallito, rc=");
       Serial.print(client.state());
@@ -113,6 +115,6 @@ void loop() {
     Serial.println(tempString);
     
     // PUBBLICA
-    client.publish(topic_pub, tempString);
+    client.publish(TOPIC_PUB, tempString);
   }
 }
