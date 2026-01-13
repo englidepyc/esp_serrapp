@@ -1,8 +1,5 @@
 #include <Arduino.h>
-
-#define DATA_PIN 47   // DS
-#define LATCH_PIN 21  // ST_CP
-#define CLOCK_PIN 19 // SH_CP
+#include "pins.h"
 
 #define  ON_R LOW
 #define  OFF_R HIGH
