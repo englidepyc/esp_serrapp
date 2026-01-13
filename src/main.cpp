@@ -1,69 +1,59 @@
 #include <Arduino.h>
 #include "shift_register.h"
+#include "driver/rtc_io.h"
 
-const int INPUT_PIN = 10;
+#define WAKE_PIN 2
+#define uS_TO_S_FACTOR 1000000ULL
+
+//prototypes
+void print_wakeup_reason();
+
+esp_sleep_wakeup_cause_t wakeup_reason;
+
 
 void setup() {
     Serial.begin(115200);
-    initShiftRegister();
-    pinMode(INPUT_PIN, INPUT_PULLUP);
+    print_wakeup_reason();
 
-    Serial.println("\n--- Sistema Pronto ---");
-    Serial.println("Comandi disponibili:");
-    Serial.println("- 'XY' : Imposta Device X (0-7) a Stato Y (0-1). Es: '01'");
-    Serial.println("- 'r'  : Leggi stato GPIO 10");
-    Serial.println("- 'H'  : Metti TUTTI i pin a HIGH");
-    Serial.println("- 'L'  : Metti TUTTI i pin a LOW");
+    
+    // 1. Initialize the pin for RTC use
+    rtc_gpio_init((gpio_num_t)WAKE_PIN);
+    rtc_gpio_set_direction((gpio_num_t)WAKE_PIN, RTC_GPIO_MODE_INPUT_ONLY);
+    
+    // 2. Enable the internal PULL-DOWN
+    rtc_gpio_pulldown_en((gpio_num_t)WAKE_PIN);
+    rtc_gpio_pullup_dis((gpio_num_t)WAKE_PIN);
+    
+    // 3. IMPORTANT: Hold the resistor state during sleep
+    rtc_gpio_hold_en((gpio_num_t)WAKE_PIN);
+
+    // 4. Configure Ext1
+    esp_sleep_enable_ext1_wakeup(1ULL << WAKE_PIN, ESP_EXT1_WAKEUP_ANY_HIGH);
+
+    esp_sleep_enable_timer_wakeup(5 * uS_TO_S_FACTOR);
+
 }
 
 void loop() {
-    if (Serial.available() > 0) {
-        char firstChar = Serial.read();
+    
+    Serial.println("Waiting 5 seconds before deep sleep...");
+    delay(5000);
+    Serial.println("Gonna sleep now\n");
+    esp_deep_sleep_start();
+    
+}
 
-        // 1. COMANDO 'r' - Lettura Digitale
-        if (firstChar == 'r' || firstChar == 'R') {
-            int val = digitalRead(INPUT_PIN);
-            Serial.print(">>> Stato GPIO 10: ");
-            Serial.println(val == HIGH ? "HIGH" : "LOW");
-        } 
-        
-        // 2. COMANDO 'H' - Tutti i pin HIGH
-        else if (firstChar == 'H' || firstChar == 'h') {
-            Serial.println(">>> TUTTI i pin impostati a HIGH");
-            current_sr_bits = 0xFF; // 11111111
-            updateShiftRegister();
-        }
+void print_wakeup_reason(){
 
-        // 3. COMANDO 'L' - Tutti i pin LOW (Master Reset Software)
-        else if (firstChar == 'L' || firstChar == 'l') {
-            Serial.println(">>> TUTTI i pin impostati a LOW");
-            current_sr_bits = 0x00; // 00000000
-            updateShiftRegister();
-        }
+  wakeup_reason = esp_sleep_get_wakeup_cause();
 
-        // 4. COMANDO 'XY' - Controllo Singolo Bit (es. '01')
-        else if (isDigit(firstChar)) {
-            delay(10); // Piccolo delay per attendere il secondo carattere
-            if (Serial.available() > 0) {
-                char secondChar = Serial.read();
-                
-                int deviceIndex = firstChar - '0';
-                bool state = (secondChar == '1');
-
-                if (deviceIndex >= 0 && deviceIndex <= 7) {
-                    Serial.print(">>> Device Q");
-                    Serial.print(deviceIndex);
-                    Serial.println(state ? " -> ON" : " -> OFF");
-                    setDevice((Device)deviceIndex, state);
-                } else {
-                    Serial.println("Errore: Indice non valido (0-7)");
-                }
-            }
-        }
-
-        // Pulizia finale del buffer
-        while(Serial.available() > 0 && (Serial.peek() == '\n' || Serial.peek() == '\r')) {
-            Serial.read();
-        }
-    }
+  switch(wakeup_reason)
+  {
+    case ESP_SLEEP_WAKEUP_EXT0 : Serial.println("Wakeup caused by external signal using RTC_IO"); break;
+    case ESP_SLEEP_WAKEUP_EXT1 : Serial.println("Wakeup caused by external signal using RTC_CNTL"); break;
+    case ESP_SLEEP_WAKEUP_TIMER : Serial.println("Wakeup caused by timer"); break;
+    case ESP_SLEEP_WAKEUP_TOUCHPAD : Serial.println("Wakeup caused by touchpad"); break;
+    case ESP_SLEEP_WAKEUP_ULP : Serial.println("Wakeup caused by ULP program"); break;
+    default : Serial.printf("Wakeup was not caused by deep sleep: %d\n",wakeup_reason); break;
+  }
 }
