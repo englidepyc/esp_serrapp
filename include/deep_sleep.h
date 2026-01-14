@@ -26,7 +26,7 @@ void print_wakeup_reason(){
   }
 }
 
-void deep_sleep_setup(){
+void deep_sleep_setup(int secondi){
     
     print_wakeup_reason();
 
@@ -45,5 +45,5 @@ void deep_sleep_setup(){
     // 4. Configure Ext1
     esp_sleep_enable_ext1_wakeup(1ULL << WAKE_PIN, ESP_EXT1_WAKEUP_ANY_HIGH);
 
-    esp_sleep_enable_timer_wakeup(5 * uS_TO_S_FACTOR);
+    esp_sleep_enable_timer_wakeup(secondi * uS_TO_S_FACTOR);
 };

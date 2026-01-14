@@ -25,8 +25,9 @@ void updateShiftRegister() {
    digitalWrite(LATCH_PIN, HIGH);
 }
 
-void setAllBits(bool state){
-    current_sr_bits = (state ? 0b11111111 : 0); 
+void setAllOutputs(bool state){
+   current_sr_bits = (state ? 0b11111111 : 0);
+   updateShiftRegister(); 
 }
 
 void setDevice(Device dev, bool state) {
