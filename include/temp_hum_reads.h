@@ -1,4 +1,6 @@
 //TODO: Testare!
+//TODO: Trovare gli indirizzi
+//TODO: Capire dove mettere i pin, aggiornare gli indirizzi
 /*Letture I2C di Temperatura e Umidità grazie al mux TCA9548A (I2C mux) dai sensori AHT20 e BMP280 sulla board*/
 
 #include <Wire.h>
