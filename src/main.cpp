@@ -5,6 +5,7 @@
 #include <freertos/event_groups.h>
 #include "config.h"
 #include "types.h"
+#include "pins.h"
 
 // Globals for Task Coordination
 QueueHandle_t dataQueue;
@@ -19,7 +20,7 @@ void setup() {
     Serial.begin(115200);
     
     // 1. Initialize Hardware (I2C, Pins, SR)
-    // pinMode(PIN_SR_LATCH, OUTPUT); ...
+    pinMode(FLOAT_SWITCH_PIN,INPUT_PULLUP);
     
     // 2. Create RTOS Objects
     dataQueue = xQueueCreate(5, sizeof(GardenMessage));
