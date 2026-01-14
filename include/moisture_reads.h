@@ -1,7 +1,7 @@
+//TODO: Testare!
 #pragma once
 #include <Arduino.h>
 #include "pins.h"
-/*VERSIONE MOCK*/
 
 
 // Valori di calibrazione (variano da sensore a sensore)
@@ -11,11 +11,7 @@ const int WATER_VALUE = 1500; // Valore letto in un bicchiere d'acqua (massima u
 
 inline int readMoisture() {
     // 1. Leggi il valore analogico grezzo (0-4095 su ESP32)
-    // int rawValue = analogRead(MOIST_AOUT_PIN); // TODO: riabilitare quando si usa il sensore reale
-
-    // Valore mockato casuale per i test
-    // Genera un valore grezzo compreso tra WATER_VALUE e AIR_VALUE
-    int rawValue = random(WATER_VALUE, AIR_VALUE + 1);
+    int rawValue = analogRead(MOIST_AOUT_PIN);
 
     // 2. Mappa il valore in una percentuale
     // Poiché AIR_VALUE è più alto di WATER_VALUE, mappiamo al contrario
