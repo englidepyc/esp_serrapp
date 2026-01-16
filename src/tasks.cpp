@@ -2,6 +2,8 @@
 #include <PubSubClient.h>
 #include "config.h"
 #include "types.h"
+static const char* TAG_TASK_MAIN = "TASKS.CPP/TASK_MAIN";
+static const char* TAG_TASK_COMMS = "TASKS.CPP/TASK_COMMS";
 
 extern QueueHandle_t dataQueue;
 extern EventGroupHandle_t syncBits;
@@ -39,7 +41,7 @@ void taskComms(void *pvParameters) {
     }else {
         // --- SECURITY ELSE BLOCK ---
         // This triggers if taskMain didn't send data within 10 seconds
-        Serial.println("Error: taskMain timed out or failed to send data!");
+        ESP_LOGE(TAG_TASK_COMMS,"taskMain timed out or failed to send data!");
         
         // Option 1: Send an 'Error' message to MQTT instead
         // Option 2: Log the error to RTC memory for the next boot

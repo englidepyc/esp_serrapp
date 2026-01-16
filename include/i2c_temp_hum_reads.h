@@ -8,6 +8,8 @@
 #include <Adafruit_BMP280.h> // Library for BMP280
 #include "pins.h"
 
+static const char* TAG = "I2C_TEMP_HUM_READS.H";
+
 Adafruit_AHTX0 aht;
 sensors_event_t humidity, temp;
 
@@ -26,16 +28,22 @@ void i2c_setup() {
   Wire.begin();
 
   //controlla che il mux i2c è ok
-  (i2c_mux_select_bus(0) != 0) ? Serial.print("[ERRORE!] Mux i2c non trovato/funziona!") : Serial.print(" Mux i2c OK!");
+  if (i2c_mux_select_bus(0) != 0) {
+    ESP_LOGW(TAG, "Mux i2c non funziona!");
+  } else {
+    ESP_LOGD(TAG, "Mux i2c OK");
+  }
 
   for (uint8_t i = 0; i < 4; i++) {
     i2c_mux_select_bus(i); // Apri il canale i
     if (!aht.begin()) {
-      Serial.printf("Sensore sul bus %d non trovato!\n", i);
+      ESP_LOGW(TAG, "Sensore sul bus %d non trovato!", i);
     } else {
-      Serial.printf("Sensore sul bus %d inizializzato.\n", i);
+      ESP_LOGD(TAG, "Sensore sul bus %d inizializzato", i);
     }
   }
+
+  ESP_LOGI(TAG,"Inizializzazione sensori i2c completata!");
 }
 
 //you can access the updated "humidity.relative_humidity" and "temp.temperature" values after

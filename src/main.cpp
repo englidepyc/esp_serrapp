@@ -7,6 +7,8 @@
 #include "types.h"
 #include "pins.h"
 
+static const char* TAG = "MAIN.CPP";
+
 // Globals for Task Coordination
 QueueHandle_t dataQueue;
 EventGroupHandle_t syncBits;
@@ -18,6 +20,7 @@ void taskComms(void *pvParameters);
 
 void setup() {
     Serial.begin(115200);
+    esp_log_level_set("*", ESP_LOG_DEBUG);
     
     // 1. Initialize Hardware (I2C, Pins, SR)
     pinMode(FLOAT_SWITCH_PIN,INPUT_PULLUP);
@@ -30,6 +33,8 @@ void setup() {
     // Main Logic on Core 1, Comms on Core 0
     xTaskCreatePinnedToCore(taskMain,  "Main",  8192, NULL, 1, NULL, 1);
     xTaskCreatePinnedToCore(taskComms, "Comms", 8192, NULL, 1, NULL, 0);
+
+    ESP_LOGI(TAG,"Task creation called!");
 
     // 4. Wait for Join (The Boss blocks here)
     xEventGroupWaitBits(syncBits, BIT_COMMS_DONE, pdFALSE, pdTRUE, portMAX_DELAY);

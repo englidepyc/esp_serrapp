@@ -6,6 +6,8 @@
 #include "pins.h" */
 #include <Arduino.h>
 
+static const char* TAG = "MOCK/I2C_TEMP_HUM_READS.H";
+
 struct Humidity{
   float relative_humidity;
 };
@@ -26,7 +28,7 @@ void i2c_mux_select_bus(uint8_t bus){
 void i2c_setup() {
   for (uint8_t i = 0; i < 4; i++) {
     i2c_mux_select_bus(i); // Apri il canale i
-      Serial.printf("Sensore sul bus %d inizializzato.\n", i);  
+      ESP_LOGD(TAG,"Mock i2c mux ok, mock sensore setup %d inizializzato.\n", i);  
   }
 }
 
