@@ -5,9 +5,11 @@
 
 #define uS_TO_S_FACTOR 1000000ULL
 
+static const char* TAG = "DEEP_SLEEP.H";
+
 //prototypes
 void print_wakeup_reason();
-void deep_sleep_setup();
+void deep_sleep_setup(int secondi);
 
 esp_sleep_wakeup_cause_t wakeup_reason;
 
@@ -17,12 +19,12 @@ void print_wakeup_reason(){
 
   switch(wakeup_reason)
   {
-    case ESP_SLEEP_WAKEUP_EXT0 : Serial.println("Wakeup caused by external signal using RTC_IO"); break;
-    case ESP_SLEEP_WAKEUP_EXT1 : Serial.println("Wakeup caused by external signal using RTC_CNTL"); break;
-    case ESP_SLEEP_WAKEUP_TIMER : Serial.println("Wakeup caused by timer"); break;
-    case ESP_SLEEP_WAKEUP_TOUCHPAD : Serial.println("Wakeup caused by touchpad"); break;
-    case ESP_SLEEP_WAKEUP_ULP : Serial.println("Wakeup caused by ULP program"); break;
-    default : Serial.printf("Wakeup was not caused by deep sleep: %d\n",wakeup_reason); break;
+    case ESP_SLEEP_WAKEUP_EXT0 : ESP_LOGI(TAG, "Wakeup caused by external signal using RTC_IO"); break;
+    case ESP_SLEEP_WAKEUP_EXT1 : ESP_LOGE(TAG, "!!!FIRE DETECTED (Normal)!!! Wakeup caused by external signal using RTC_CNTL (Ext1)"); break;
+    case ESP_SLEEP_WAKEUP_TIMER : ESP_LOGI(TAG, "Wakeup caused by timer"); break;
+    case ESP_SLEEP_WAKEUP_TOUCHPAD : ESP_LOGI(TAG, "Wakeup caused by touchpad"); break;
+    case ESP_SLEEP_WAKEUP_ULP : ESP_LOGI(TAG, "Wakeup caused by ULP program"); break;
+    default : ESP_LOGI(TAG, "Wakeup was not caused by deep sleep: %d", wakeup_reason); break;
   }
 }
 

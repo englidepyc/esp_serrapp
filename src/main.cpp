@@ -7,6 +7,13 @@
 #include "types.h"
 #include "pins.h"
 
+#include "mocks/i2c_temp_hum_reads.h"
+#include "mocks/camera.h"
+#include "deep_sleep.h"
+#include "shift_register.h"
+
+static const char* TAG = "MAIN.CPP";
+
 // Globals for Task Coordination
 QueueHandle_t dataQueue;
 EventGroupHandle_t syncBits;
@@ -18,9 +25,11 @@ void taskComms(void *pvParameters);
 
 void setup() {
     Serial.begin(115200);
+    esp_log_level_set("*", ESP_LOG_DEBUG);
     
     // 1. Initialize Hardware (I2C, Pins, SR)
     pinMode(FLOAT_SWITCH_PIN,INPUT_PULLUP);
+
     
     // 2. Create RTOS Objects
     dataQueue = xQueueCreate(5, sizeof(GardenMessage));
@@ -31,14 +40,11 @@ void setup() {
     xTaskCreatePinnedToCore(taskMain,  "Main",  8192, NULL, 1, NULL, 1);
     xTaskCreatePinnedToCore(taskComms, "Comms", 8192, NULL, 1, NULL, 0);
 
+    ESP_LOGI(TAG,"Task creation called!");
+
     // 4. Wait for Join (The Boss blocks here)
     xEventGroupWaitBits(syncBits, BIT_COMMS_DONE, pdFALSE, pdTRUE, portMAX_DELAY);
 
-    // 5. Enter Deep Sleep
-    Serial.println("System going to sleep...");
-    esp_sleep_enable_timer_wakeup(DEEP_SLEEP_SEC * 1000000ULL);
-    // esp_sleep_enable_ext0_wakeup...
-    esp_deep_sleep_start();
 }
 
 void loop() {} // loop() is never reached

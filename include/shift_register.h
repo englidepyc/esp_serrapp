@@ -1,6 +1,9 @@
 #include <Arduino.h>
 #include "pins.h"
 
+static const char* TAG = "SHIFT_REGISTER.H";
+const char* deviceNames[] = {"PUMP", "HEATER", "HEAT_FAN", "HUMIDIFIER", "EXT_FAN", "AMUX0", "AMUX1", "AMUX2"};
+
 #define  ON_R LOW
 #define  OFF_R HIGH
 
@@ -31,14 +34,21 @@ void setAllOutputs(bool state){
 }
 
 void setDevice(Device dev, bool state) {
- state ? bitSet(current_sr_bits, dev) : bitClear(current_sr_bits, dev);
- updateShiftRegister();
+   state ? bitSet(current_sr_bits, dev) : bitClear(current_sr_bits, dev);
+   updateShiftRegister();
+
+   // Using your ON_R (LOW) define for clarity
+   if (state == ON_R) {
+     ESP_LOGI(TAG, "%s activated!", deviceNames[dev]);
+   } else {
+     ESP_LOGI(TAG, "%s deactivated", deviceNames[dev]);
+   }
 }
 
 void setAmuxChannel(byte channel) {
     
    if (channel > 7){
-      Serial.print("Canale mux analogico specificato non valido!\n");
+      ESP_LOGW(TAG, "Canale mux analogico specificato non valido!\n");
       return;
     } 
     
@@ -55,6 +65,7 @@ void setAmuxChannel(byte channel) {
 
     // 4. Inviamo allo Shift Register
     updateShiftRegister();
+    ESP_LOGD(TAG, "Mux analogico settato sul canale %d",channel);
 }
 
 
@@ -66,4 +77,5 @@ void initShiftRegister() {
 
    current_sr_bits = 0b11111111;
    updateShiftRegister();
+   ESP_LOGI(TAG, "Shift register setup: tutto DISATTIVATO (alto)");
 }
