@@ -34,11 +34,6 @@ void setup() {
     // 4. Wait for Join (The Boss blocks here)
     xEventGroupWaitBits(syncBits, BIT_COMMS_DONE, pdFALSE, pdTRUE, portMAX_DELAY);
 
-    // 5. Enter Deep Sleep
-    Serial.println("System going to sleep...");
-    esp_sleep_enable_timer_wakeup(DEEP_SLEEP_SEC * 1000000ULL);
-    // esp_sleep_enable_ext0_wakeup...
-    esp_deep_sleep_start();
 }
 
 void loop() {} // loop() is never reached

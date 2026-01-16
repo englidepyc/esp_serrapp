@@ -31,11 +31,18 @@ void taskComms(void *pvParameters) {
     // TODO: Setup MQTT (PubSubClient)
 
     // Wait for data from Task Main
-    if (xQueueReceive(dataQueue, &rcv, pdMS_TO_TICKS(10000))) {
+    if (xQueueReceive(dataQueue, &rcv, pdMS_TO_TICKS(10000)) == pdPASS) {
         // TODO: Connect MQTT
         // TODO: Format JSON Payload
         // TODO: client.publish()
         // TODO: Check for incoming commands (Photo flag)
+    }else {
+        // --- SECURITY ELSE BLOCK ---
+        // This triggers if taskMain didn't send data within 10 seconds
+        Serial.println("Error: taskMain timed out or failed to send data!");
+        
+        // Option 1: Send an 'Error' message to MQTT instead
+        // Option 2: Log the error to RTC memory for the next boot
     }
 
     // Signal setup() that we are finished
