@@ -12,18 +12,21 @@ Adafruit_AHTX0 aht;
 sensors_event_t humidity, temp;
 
 //TCA9548A
-void i2c_mux_select_bus(uint8_t bus){
+uint8_t i2c_mux_select_bus(uint8_t bus){
   if (bus > 7) return; // Protezione: il multiplexer ha solo 8 canali (0-7)
   
   Wire.beginTransmission(0x70); //collegare a low a0-2
   Wire.write(1 << bus);
-  Wire.endTransmission();
+  uint8_t error_code = Wire.endTransmission();
+  return error_code;
 }
 
 //inzializza tutti i sensori sul mux, da chiamare al setup
 void i2c_setup() {
   Wire.begin();
-  Serial.begin(115200);
+
+  //controlla che il mux i2c è ok
+  (i2c_mux_select_bus(0) != 0) ? Serial.print("[ERRORE!] Mux i2c non trovato/funziona!") : Serial.print(" Mux i2c OK!");
 
   for (uint8_t i = 0; i < 4; i++) {
     i2c_mux_select_bus(i); // Apri il canale i
