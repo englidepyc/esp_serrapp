@@ -41,7 +41,7 @@ void setDevice(Device dev, bool state) {
    if (state == ON_R) {
      ESP_LOGI(TAG, "%s activated!", deviceNames[dev]);
    } else {
-     ESP_LOGD(TAG, "%s deactivated", deviceNames[dev]);
+     ESP_LOGI(TAG, "%s deactivated", deviceNames[dev]);
    }
 }
 

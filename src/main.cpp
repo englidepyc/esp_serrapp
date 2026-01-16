@@ -7,6 +7,11 @@
 #include "types.h"
 #include "pins.h"
 
+#include "mocks/i2c_temp_hum_reads.h"
+#include "mocks/camera.h"
+#include "deep_sleep.h"
+#include "shift_register.h"
+
 static const char* TAG = "MAIN.CPP";
 
 // Globals for Task Coordination
@@ -24,6 +29,7 @@ void setup() {
     
     // 1. Initialize Hardware (I2C, Pins, SR)
     pinMode(FLOAT_SWITCH_PIN,INPUT_PULLUP);
+
     
     // 2. Create RTOS Objects
     dataQueue = xQueueCreate(5, sizeof(GardenMessage));

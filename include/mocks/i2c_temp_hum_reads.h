@@ -4,7 +4,9 @@
 #include <Adafruit_AHTX0.h> // Library for AHT20
 #include <Adafruit_BMP280.h> // Library for BMP280
 #include "pins.h" */
+#pragma once
 #include <Arduino.h>
+
 
 static const char* TAG = "MOCK/I2C_TEMP_HUM_READS.H";
 
