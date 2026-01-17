@@ -4,33 +4,31 @@
 #include "pins.h"
 
 #define uS_TO_S_FACTOR 1000000ULL
+#define FIRE_EXT1_WAKEUP ESP_SLEEP_WAKEUP_EXT1
 
-static const char* TAG = "DEEP_SLEEP.H";
+static const char* DEEP_SLEEP_H_TAG = "DEEP_SLEEP.H";
 
 //prototypes
-void print_wakeup_reason();
+void print_wakeup_reason(esp_sleep_wakeup_cause_t wr);
 void deep_sleep_setup(int secondi);
 
-esp_sleep_wakeup_cause_t wakeup_reason;
+void print_wakeup_reason(esp_sleep_wakeup_cause_t wr){
 
-void print_wakeup_reason(){
-
-  wakeup_reason = esp_sleep_get_wakeup_cause();
-
-  switch(wakeup_reason)
+  switch(wr)
   {
-    case ESP_SLEEP_WAKEUP_EXT0 : ESP_LOGI(TAG, "Wakeup caused by external signal using RTC_IO"); break;
-    case ESP_SLEEP_WAKEUP_EXT1 : ESP_LOGE(TAG, "!!!FIRE DETECTED (Normal)!!! Wakeup caused by external signal using RTC_CNTL (Ext1)"); break;
-    case ESP_SLEEP_WAKEUP_TIMER : ESP_LOGI(TAG, "Wakeup caused by timer"); break;
-    case ESP_SLEEP_WAKEUP_TOUCHPAD : ESP_LOGI(TAG, "Wakeup caused by touchpad"); break;
-    case ESP_SLEEP_WAKEUP_ULP : ESP_LOGI(TAG, "Wakeup caused by ULP program"); break;
-    default : ESP_LOGI(TAG, "Wakeup was not caused by deep sleep: %d", wakeup_reason); break;
+    case ESP_SLEEP_WAKEUP_EXT0 : ESP_LOGI(DEEP_SLEEP_H_TAG, "Wakeup caused by external signal using RTC_IO"); break;
+    case ESP_SLEEP_WAKEUP_EXT1 : ESP_LOGE(DEEP_SLEEP_H_TAG, "!!!FIRE DETECTED (Normal)!!! Wakeup caused by external signal using RTC_CNTL (Ext1)"); break;
+    case ESP_SLEEP_WAKEUP_TIMER : ESP_LOGI(DEEP_SLEEP_H_TAG, "Wakeup caused by timer"); break;
+    case ESP_SLEEP_WAKEUP_TOUCHPAD : ESP_LOGI(DEEP_SLEEP_H_TAG, "Wakeup caused by touchpad"); break;
+    case ESP_SLEEP_WAKEUP_ULP : ESP_LOGI(DEEP_SLEEP_H_TAG, "Wakeup caused by ULP program"); break;
+    default : ESP_LOGI(DEEP_SLEEP_H_TAG, "Wakeup was not caused by deep sleep: %d", wr); break;
   }
 }
 
+
+
+//setup per il risveglio sblocca e setta il pin rtc, timer e restituisce causa risveglio
 void deep_sleep_setup(int secondi){
-    
-    print_wakeup_reason();
 
     // the pull down etc is "sticky" so it remains while awake    
     // 1. Initialize the pin for RTC use
@@ -46,6 +44,6 @@ void deep_sleep_setup(int secondi){
 
     // 4. Configure Ext1
     esp_sleep_enable_ext1_wakeup(1ULL << WAKE_PIN, ESP_EXT1_WAKEUP_ANY_HIGH);
-
     esp_sleep_enable_timer_wakeup(secondi * uS_TO_S_FACTOR);
-};
+    ESP_LOGI(DEEP_SLEEP_H_TAG, "Deep Sleep setup complete with timer %d seconds!", secondi);
+}
