@@ -8,7 +8,7 @@
 #include <Arduino.h>
 
 
-static const char* TAG = "MOCK/I2C_TEMP_HUM_READS.H";
+static const char* M_I2C_TEMP_HUM_READS_H_TAG = "MOCK/I2C_TEMP_HUM_READS.H";
 
 struct Humidity{
   float relative_humidity;
@@ -30,7 +30,7 @@ void i2c_mux_select_bus(uint8_t bus){
 void i2c_setup() {
   for (uint8_t i = 0; i < 4; i++) {
     i2c_mux_select_bus(i); // Apri il canale i
-      ESP_LOGD(TAG,"Mock i2c mux ok, mock sensore setup %d inizializzato.\n", i);  
+      ESP_LOGD(M_I2C_TEMP_HUM_READS_H_TAG,"Mock i2c mux ok, mock sensore setup %d inizializzato.\n", i);  
   }
 }
 

@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include "pins.h"
 
-static const char* TAG = "SHIFT_REGISTER.H";
+static const char* SHIFT_REGISTER_H_TAG = "SHIFT_REGISTER.H";
 const char* deviceNames[] = {"PUMP", "HEATER", "HEAT_FAN", "HUMIDIFIER", "EXT_FAN", "AMUX0", "AMUX1", "AMUX2"};
 
 #define  ON_R LOW
@@ -39,16 +39,16 @@ void setDevice(Device dev, bool state) {
 
    // Using your ON_R (LOW) define for clarity
    if (state == ON_R) {
-     ESP_LOGI(TAG, "%s activated!", deviceNames[dev]);
+       ESP_LOGI(SHIFT_REGISTER_H_TAG, "%s activated!", deviceNames[dev]);
    } else {
-     ESP_LOGI(TAG, "%s deactivated", deviceNames[dev]);
+       ESP_LOGI(SHIFT_REGISTER_H_TAG, "%s deactivated", deviceNames[dev]);
    }
 }
 
 void setAmuxChannel(byte channel) {
     
    if (channel > 7){
-      ESP_LOGW(TAG, "Canale mux analogico specificato non valido!\n");
+      ESP_LOGW(SHIFT_REGISTER_H_TAG, "Canale mux analogico specificato non valido!\n");
       return;
     } 
     
@@ -65,7 +65,7 @@ void setAmuxChannel(byte channel) {
 
     // 4. Inviamo allo Shift Register
     updateShiftRegister();
-    ESP_LOGD(TAG, "Mux analogico settato sul canale %d",channel);
+   ESP_LOGD(SHIFT_REGISTER_H_TAG, "Mux analogico settato sul canale %d",channel);
 }
 
 
@@ -77,5 +77,5 @@ void initShiftRegister() {
 
    current_sr_bits = 0b11111111;
    updateShiftRegister();
-   ESP_LOGI(TAG, "Shift register setup: tutto DISATTIVATO (alto)");
+   ESP_LOGI(SHIFT_REGISTER_H_TAG, "Shift register setup: tutto DISATTIVATO (alto)");
 }

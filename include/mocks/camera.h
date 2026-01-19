@@ -1,8 +1,8 @@
 #pragma once
 #include <Arduino.h>
 
-static const char* TAG = "MOCK/CAMERA.H";
+static const char* M_CAMERA_H_TAG = "MOCK/CAMERA.H";
 
 void init_camera_system(){
-    ESP_LOGD(TAG,"Mock Camera Initialized!");
+    ESP_LOGD(M_CAMERA_H_TAG,"Mock Camera Initialized!");
 };
