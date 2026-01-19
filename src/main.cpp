@@ -15,17 +15,24 @@
 #include "mocks/shift_register.h"
 #include "deep_sleep.h"
 
-static const char* MAIN_CPP_TAG = "MAIN.CPP";
+static const char* MAIN_CPP_TAG = "MAIN.CPP/SETUP";
+// Globals for Task Coordination
+QueueHandle_t dataQueue;
+EventGroupHandle_t syncBits;
+#define BIT_COMMS_DONE (1 << 0)
 
 //ISR e flag per fuoco
+#define BIT_FIRE        (1 << 1)
 volatile RTC_NOINIT_ATTR bool fire_reboot_triggered;
-SemaphoreHandle_t fireSemaphore;
 void IRAM_ATTR fire_isr() {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    xSemaphoreGiveFromISR(fireSemaphore, &xHigherPriorityTaskWoken);
     
-    // CRITICAL: This forces the CPU to jump to taskPanic IMMEDIATELY
-    // We don't wait for the next tick. We switch context NOW.
+    // Set the FIRE bit from the ISR
+    if (syncBits != NULL) {
+        xEventGroupSetBitsFromISR(syncBits, BIT_FIRE, &xHigherPriorityTaskWoken);
+    }
+
+    // Force context switch if setup() was waiting for this
     if (xHigherPriorityTaskWoken) {
         portYIELD_FROM_ISR();
     }
@@ -33,14 +40,8 @@ void IRAM_ATTR fire_isr() {
 
 //prototipi
 void execute_fire_protocol();
-void taskPanic(void *pvParameters);
 void taskMango(void *pvParameters);
 void taskComms(void *pvParameters);
-
-// Globals for Task Coordination
-QueueHandle_t dataQueue;
-EventGroupHandle_t syncBits;
-#define BIT_COMMS_DONE (1 << 0)
 
 void setup() {
     Serial.begin(115200);
@@ -79,22 +80,31 @@ void setup() {
     syncBits = xEventGroupCreate();
 
     // 3. Launch Workers
-    // Main Logic on Core 1, Comms on Core 0, task del reboot in caso fuoco con massima priorità
-    fireSemaphore = xSemaphoreCreateBinary();
-    xTaskCreatePinnedToCore(taskPanic, "Panic", 2048, NULL, configMAX_PRIORITIES - 1, NULL, 1);
     xTaskCreatePinnedToCore(taskMango,  "Mango",  8192, NULL, 1, NULL, 1);
     xTaskCreatePinnedToCore(taskComms, "Comms", 8192, NULL, 1, NULL, 0);
 
     ESP_LOGI(MAIN_CPP_TAG,"Task creation called!");
 
 
+    //Aspetto che finiscono le comunicazioni oppure il fuoco
     EventBits_t bits = xEventGroupWaitBits(
         syncBits, 
-        BIT_COMMS_DONE, 
-        pdFALSE,        // Don't clear bits here
-        pdTRUE,         // Wait for all bits
-        portMAX_DELAY  // <--- The timeout allows us to loop back and check fire
+        BIT_COMMS_DONE | BIT_FIRE, // Watch for these bits
+        pdFALSE,                   // Clear bits on exit? (False: we want to read them)
+        pdFALSE,                   // WaitForAllBits? FALSE = "OR" Logic (Wake on ANY)
+        portMAX_DELAY              // Block forever until one happens
     );
+
+    if ((bits & BIT_FIRE) != 0) {
+        // CASE A: FIRE DETECTED
+        ESP_LOGE(MAIN_CPP_TAG, "Wakeup caused by FIRE BIT! Rebooting...");
+        fire_reboot_triggered = true;
+        esp_restart();
+    } 
+    else if ((bits & BIT_COMMS_DONE) != 0) {
+        // CASE B: NORMAL COMPLETION
+        ESP_LOGI(MAIN_CPP_TAG, "Tasks finished normally. Sleeping.");
+    }
 
     //5. Hold fire pin and Sleep again
     deep_sleep_setup(10);
@@ -103,21 +113,6 @@ void setup() {
 }
 
 void loop() {}
-
-// 2. The Guardian Task (The Executioner)
-void taskPanic(void *pvParameters) {
-    // This task sits here forever, blocked, using 0 CPU.
-    xSemaphoreTake(fireSemaphore, portMAX_DELAY);
-    
-    // If we get here, the ISR fired.
-    ESP_LOGE("PANIC", "Fire detected! Preempting everything and restarting...");
-    
-    // Set the persistent flag so we know to scream on reboot
-    fire_reboot_triggered = true; 
-    
-    esp_restart();
-}
-
 
 void execute_fire_protocol() {
     //TODO: Testare e mettere se necessario un topic a parte
