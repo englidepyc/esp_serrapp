@@ -78,8 +78,35 @@ void setup() {
 
     ESP_LOGI(MAIN_CPP_TAG,"Task creation called!");
 
-    // 4. Wait for Join (The Boss blocks here)
-    xEventGroupWaitBits(syncBits, BIT_COMMS_DONE, pdFALSE, pdTRUE, portMAX_DELAY);
+    // 4. ACTIVE WAIT (The Boss monitors Fire while waiting for workers)
+    const TickType_t xCheckInterval = 100 / portTICK_PERIOD_MS; // Check every 100ms
+
+    while (true) {
+        // --- A. PRIORITY CHECK: IS THE HOUSE ON FIRE? ---
+        if (fire_reboot_triggered) {
+            ESP_LOGE(MAIN_CPP_TAG, "Fire detected while waiting for tasks! Rebooting...");
+            esp_restart(); // This triggers the safety reboot logic
+        }
+
+        // --- B. CHECK WORKERS: ARE THEY DONE? ---
+        // We wait only 100ms. This acts as our "delay" but also checks the EventBits.
+        EventBits_t bits = xEventGroupWaitBits(
+            syncBits, 
+            BIT_COMMS_DONE, 
+            pdFALSE,        // Don't clear bits here
+            pdTRUE,         // Wait for all bits
+            xCheckInterval  // <--- The timeout allows us to loop back and check fire
+        );
+
+        // --- C. EXIT CONDITION ---
+        if ((bits & BIT_COMMS_DONE) == BIT_COMMS_DONE) {
+            ESP_LOGI(MAIN_CPP_TAG, "Tasks completed. preparing for sleep.");
+            break; // Exit the while loop
+        }
+    }
+
+    // 5. Hold fire pin and Sleep again
+    // ... rest of your code ...
 
     //5. Hold fire pin and Sleep again
     deep_sleep_setup(10);
@@ -87,16 +114,7 @@ void setup() {
 
 }
 
-void loop() {
-    // This runs continuously on Core 1 (per adesso niente semaforo)
-    if (fire_reboot_triggered) {
-        ESP_LOGE("FIRE ISR", "Fire Interrupt Triggered! Rebooting in fire mode!");
-        esp_restart();
-    }
-
-    // Per evitare di starvare le altre task (identico a vTaskDelay nel comportamento)
-    delay(10);  
-}
+void loop() {}
 
 
 void execute_fire_protocol() {
