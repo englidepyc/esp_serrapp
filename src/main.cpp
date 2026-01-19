@@ -17,16 +17,23 @@
 
 static const char* MAIN_CPP_TAG = "MAIN.CPP";
 
-//Global flag for fire
+//ISR e flag per fuoco
 volatile RTC_NOINIT_ATTR bool fire_reboot_triggered;
-
-//prototipi e isr
-void execute_fire_protocol();
+SemaphoreHandle_t fireSemaphore;
 void IRAM_ATTR fire_isr() {
-    fire_reboot_triggered = true;
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xSemaphoreGiveFromISR(fireSemaphore, &xHigherPriorityTaskWoken);
+    
+    // CRITICAL: This forces the CPU to jump to taskPanic IMMEDIATELY
+    // We don't wait for the next tick. We switch context NOW.
+    if (xHigherPriorityTaskWoken) {
+        portYIELD_FROM_ISR();
+    }
 }
 
-//in tasks.cpp
+//prototipi
+void execute_fire_protocol();
+void taskPanic(void *pvParameters);
 void taskMango(void *pvParameters);
 void taskComms(void *pvParameters);
 
@@ -61,8 +68,8 @@ void setup() {
     rtc_gpio_hold_dis((gpio_num_t)WAKE_PIN); //sblocca il pin che era stato attaccato all'rtc deep sleep per accesso durante la veglia
     pinMode(WAKE_PIN, INPUT_PULLDOWN);
     attachInterrupt(digitalPinToInterrupt(WAKE_PIN), fire_isr, RISING);
-    pinMode(FLOAT_SWITCH_PIN,INPUT_PULLUP);
-    
+    pinMode(FLOAT_SWITCH_PIN,INPUT_PULLUP);    
+
     i2c_setup();
     init_camera_system();
 
@@ -72,41 +79,22 @@ void setup() {
     syncBits = xEventGroupCreate();
 
     // 3. Launch Workers
-    // Main Logic on Core 1, Comms on Core 0
+    // Main Logic on Core 1, Comms on Core 0, task del reboot in caso fuoco con massima priorità
+    fireSemaphore = xSemaphoreCreateBinary();
+    xTaskCreatePinnedToCore(taskPanic, "Panic", 2048, NULL, configMAX_PRIORITIES - 1, NULL, 1);
     xTaskCreatePinnedToCore(taskMango,  "Mango",  8192, NULL, 1, NULL, 1);
     xTaskCreatePinnedToCore(taskComms, "Comms", 8192, NULL, 1, NULL, 0);
 
     ESP_LOGI(MAIN_CPP_TAG,"Task creation called!");
 
-    // 4. ACTIVE WAIT (The Boss monitors Fire while waiting for workers)
-    const TickType_t xCheckInterval = 100 / portTICK_PERIOD_MS; // Check every 100ms
 
-    while (true) {
-        // --- A. PRIORITY CHECK: IS THE HOUSE ON FIRE? ---
-        if (fire_reboot_triggered) {
-            ESP_LOGE(MAIN_CPP_TAG, "Fire detected while waiting for tasks! Rebooting...");
-            esp_restart(); // This triggers the safety reboot logic
-        }
-
-        // --- B. CHECK WORKERS: ARE THEY DONE? ---
-        // We wait only 100ms. This acts as our "delay" but also checks the EventBits.
-        EventBits_t bits = xEventGroupWaitBits(
-            syncBits, 
-            BIT_COMMS_DONE, 
-            pdFALSE,        // Don't clear bits here
-            pdTRUE,         // Wait for all bits
-            xCheckInterval  // <--- The timeout allows us to loop back and check fire
-        );
-
-        // --- C. EXIT CONDITION ---
-        if ((bits & BIT_COMMS_DONE) == BIT_COMMS_DONE) {
-            ESP_LOGI(MAIN_CPP_TAG, "Tasks completed. preparing for sleep.");
-            break; // Exit the while loop
-        }
-    }
-
-    // 5. Hold fire pin and Sleep again
-    // ... rest of your code ...
+    EventBits_t bits = xEventGroupWaitBits(
+        syncBits, 
+        BIT_COMMS_DONE, 
+        pdFALSE,        // Don't clear bits here
+        pdTRUE,         // Wait for all bits
+        portMAX_DELAY  // <--- The timeout allows us to loop back and check fire
+    );
 
     //5. Hold fire pin and Sleep again
     deep_sleep_setup(10);
@@ -115,6 +103,20 @@ void setup() {
 }
 
 void loop() {}
+
+// 2. The Guardian Task (The Executioner)
+void taskPanic(void *pvParameters) {
+    // This task sits here forever, blocked, using 0 CPU.
+    xSemaphoreTake(fireSemaphore, portMAX_DELAY);
+    
+    // If we get here, the ISR fired.
+    ESP_LOGE("PANIC", "Fire detected! Preempting everything and restarting...");
+    
+    // Set the persistent flag so we know to scream on reboot
+    fire_reboot_triggered = true; 
+    
+    esp_restart();
+}
 
 
 void execute_fire_protocol() {
