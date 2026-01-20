@@ -1,3 +1,4 @@
+constexpr static const char* MAIN_CPP_TAG = "MAIN.CPP/SETUP";
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -6,23 +7,24 @@
 #include <PubSubClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
-#include "config.h"
-#include "types.h"
-#include "pins.h"
 
-#include "mocks/i2c_temp_hum_reads.h"
-#include "mocks/camera.h"
-#include "mocks/shift_register.h"
+#include "common.h"
+
 #include "deep_sleep.h"
 
-static const char* MAIN_CPP_TAG = "MAIN.CPP/SETUP";
+#define BIT_FIRE       (1 << 1)
+#define BIT_COMMS_DONE (1 << 0)
+
+//prototipi
+void execute_fire_protocol();
+void taskMango(void *pvParameters);
+void taskComms(void *pvParameters);
+
 // Globals for Task Coordination
 QueueHandle_t dataQueue;
 EventGroupHandle_t syncBits;
-#define BIT_COMMS_DONE (1 << 0)
 
 //ISR e flag per fuoco
-#define BIT_FIRE        (1 << 1)
 volatile RTC_NOINIT_ATTR bool fire_reboot_triggered;
 void IRAM_ATTR fire_isr() {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -37,11 +39,6 @@ void IRAM_ATTR fire_isr() {
         portYIELD_FROM_ISR();
     }
 }
-
-//prototipi
-void execute_fire_protocol();
-void taskMango(void *pvParameters);
-void taskComms(void *pvParameters);
 
 void setup() {
     Serial.begin(115200);

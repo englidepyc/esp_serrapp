@@ -3,14 +3,24 @@
 
 struct GardenMessage {
     float temp;        // "t"
-    float hum;         // "h"
-    int moisture;      // "m"
-    bool waterOk;      // "w"
-    float battery;     // "v"
-    uint8_t actState;  // "act" (Shift Register State)
-    int errCode;       // "err"
-    const char* rst;   // "rst"
+    float hum;
+    float vpd;         // "h"
+    int moisture;
+    float waterCalcLevel;       // "m"
+    bool isWaterOver;      // "w"  
+    int nextMessageTime; //in minutes
+    bool isActuated;    
     
+    int errCode;       // "err"
+    bool isFire;
+
     // Commands received from MQTT (Optional feedback loop)
-    bool cmdPhotoReq; 
+    bool isCmdPhoto;
+    bool isCmdModeEco;
+};
+
+struct CmdMessage {
+    bool CmdPhotoReq;
+    bool CmdModeEco;
+    bool CmdStop;
 };
