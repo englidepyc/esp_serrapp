@@ -22,11 +22,10 @@ void i2c_setup() {
 }
 
 //returns a single measured relative humidity and temperature out of an aht sensor
-i2c_th_reading i2c_update_temperature_hum(){
-  i2c_th_reading reading;
-  
-  reading.temp = (float)random(5, 41);              // 5 to 40 °C
-  reading.hum = (float)random(0, 101);              // 0 to 100 %
-  
-  return reading;
+void i2c_temp_hum_vpd_scan(float &hum, float &temp, float &vpd){ 
+  temp = (float)random(5, 41);              // 5 to 40 °C
+  hum = (float)random(0, 101);              // 0 to 100 %
+  vpd = (float)random(10, 35) / 10.0;       // 1.0 to 3.5 kPa (typical VPD range for southern Italy summer)
 }
+
+float calculate_vpd(float temp, float hum){return 1.0f;}

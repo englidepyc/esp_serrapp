@@ -1,0 +1,1 @@
+constexpr static int SLEEP_FIXED_DURATION = 600;

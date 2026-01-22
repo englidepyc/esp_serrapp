@@ -11,6 +11,7 @@ constexpr static const char* MAIN_CPP_TAG = "MAIN.CPP/SETUP";
 #include "common.h"
 
 #include "deep_sleep.h"
+#include "main.h"
 
 #define BIT_FIRE       (1 << 1)
 #define BIT_COMMS_DONE (1 << 0)
@@ -104,7 +105,7 @@ void setup() {
     }
 
     //5. Hold fire pin and Sleep again
-    deep_sleep_setup(10);
+    deep_sleep_setup(SLEEP_FIXED_DURATION);
     esp_deep_sleep_start();
 
 }

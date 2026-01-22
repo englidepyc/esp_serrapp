@@ -1,3 +1,2 @@
 #pragma once
-int readMoisture();
-void analogMoistReadSetup();
+int readMoisture_scan();
