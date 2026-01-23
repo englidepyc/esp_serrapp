@@ -1,5 +1,5 @@
+//per interfacciarsi con l'hardware
 #pragma once
-#include "config.h"
 #include "types.h"
 #include "pins.h"
 

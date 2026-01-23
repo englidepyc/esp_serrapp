@@ -1,5 +1,5 @@
 extern const char* TASKS_CPP_MANGO_TAG;
-#include "common.h"
+#include "common_hw.h"
 #include "control/proportional.h"
 
 void proportional_actuation(GardenMessage* msg) {

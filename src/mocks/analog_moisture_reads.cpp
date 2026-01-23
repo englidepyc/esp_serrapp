@@ -10,7 +10,7 @@ static const int AIR_VALUE = 3200;   // Valore letto all'aria (completamente asc
 static const int WATER_VALUE = 1500; // Valore letto in un bicchiere d'acqua (massima umidità)
 
 //restituisce il tutto scannando
-int readMoisture_scan() {
+int readMoisture_single() {
     // 1. Leggi il valore analogico grezzo (0-4095 su ESP32)
     // int rawValue = analogRead(MOIST_AOUT_PIN); // TODO: riabilitare quando si usa il sensore reale
 
@@ -26,4 +26,8 @@ int readMoisture_scan() {
     percentage = constrain(percentage, 0, 100);
 
     return percentage;
+}
+
+int readMoisture_scan() {
+    return readMoisture_single();
 }

@@ -1,5 +1,4 @@
 #pragma once
-
 //SHIFT REGISTER
 #define DATA_PIN 47   // DS
 #define LATCH_PIN 21  // ST_CP

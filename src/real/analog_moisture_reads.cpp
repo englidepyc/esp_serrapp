@@ -4,11 +4,7 @@ constexpr static const char* TAG = "ANALOG_MOISTURE_READS.CPP";
 #include "pins.h"
 #include "analog_moisture_reads.h"
 
-// Valori di calibrazione (variano da sensore a sensore)
-static const int AIR_VALUE = 3200;   // Valore letto all'aria (completamente asciutto)
-static const int WATER_VALUE = 1500; // Valore letto in un bicchiere d'acqua (massima umidità)
-
-int readMoisture() {
+int readMoisture_single() {
     // 1. Leggi il valore analogico grezzo (0-4095 su ESP32)
     int rawValue = analogRead(MOIST_AOUT_PIN);
 
@@ -22,6 +18,6 @@ int readMoisture() {
     return percentage;
 }
 
-void analogMoistReadSetup(){
-    pinMode(MOIST_AOUT_PIN,INPUT);
+int readMoisture_scan() {
+    return readMoisture_single();
 }

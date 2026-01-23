@@ -8,7 +8,8 @@ constexpr static const char* MAIN_CPP_TAG = "MAIN.CPP/SETUP";
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 
-#include "common.h"
+#include "config.h"
+#include "common_hw.h"
 
 #include "deep_sleep.h"
 #include "main.h"
@@ -63,11 +64,12 @@ void setup() {
     }
     
     
-    //impostiamo pin acuqa e fuoco e mettiamo l'interrupt che setta flag reboot fuoco durante la fase "da sveglio"
+    //impostiamo pin acuqa, fuoco e ingresso analog (moisture) e mettiamo l'interrupt che setta flag reboot fuoco durante la fase "da sveglio"
     rtc_gpio_hold_dis((gpio_num_t)WAKE_PIN); //sblocca il pin che era stato attaccato all'rtc deep sleep per accesso durante la veglia
     pinMode(WAKE_PIN, INPUT_PULLDOWN);
     attachInterrupt(digitalPinToInterrupt(WAKE_PIN), fire_isr, RISING);
-    pinMode(FLOAT_SWITCH_PIN,INPUT_PULLUP);    
+    pinMode(FLOAT_SWITCH_PIN,INPUT_PULLUP);
+    pinMode(MOIST_AOUT_PIN,INPUT);    
 
     i2c_setup();
     init_camera_system();

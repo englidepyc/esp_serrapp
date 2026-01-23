@@ -1,7 +1,8 @@
-constexpr static const char* TASKS_CPP_MANGO_TAG = "TASK_MANGO.CPP";
+extern const char* TASKS_CPP_MANGO_TAG = "TASK_MANGO.CPP";
 #include <Arduino.h>
 
-#include "common.h"
+#include "config.h"
+#include "common_hw.h"
 #include "control/proportional.h"
 
 extern QueueHandle_t dataQueue;
@@ -16,7 +17,7 @@ void taskMango(void *pvParameters) {
     //TODO: IMPLEMENTARE LOGICA ACQUA FINITA e CALCOLO LIVELLO DELL'ACQUA
     msg.isWaterOver = !(digitalRead(FLOAT_SWITCH_PIN)); //logica negata    
     // TODO: Implement sensor reading logic
-    i2c_temp_hum_vpd_scan(msg.hum, msg.temp, msg.vpd);
+    i2c_temp_hum_vpd_scan(msg.hum, msg.temp, msg.vpd, 0);
     msg.moisture = readMoisture_scan();
     msg.waterCalcLevel = 50; //%
 
