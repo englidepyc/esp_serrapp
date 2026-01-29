@@ -1,44 +1,25 @@
-#pragma once
+constexpr static const char* M_SHIFT_REGISTER_H_TAG = "MOCK/SHIFT_REGISTER.CPP";
+static const char* deviceNames[] = {"PUMP", "HEATER", "HEAT_FAN", "HUMIDIFIER", "EXT_FAN", "AMUX0", "AMUX1", "AMUX2"};
 #include <Arduino.h>
 #include "pins.h"
+#include "shift_register.h"
 
-static const char* M_SHIFT_REGISTER_H_TAG = "MOCK/SHIFT_REGISTER.H";
-
-// Keep the same device names array for logging and compatibility
-const char* deviceNames[] = {"PUMP", "HEATER", "HEAT_FAN", "HUMIDIFIER", "EXT_FAN", "AMUX0", "AMUX1", "AMUX2"};
-
-// Same macros as the real implementation
-#define  ON_R LOW
-#define  OFF_R HIGH
-
-// Same enum for devices so existing code compiles unchanged
-enum Device : byte {
-   PUMP_Q0     = 0,
-   HEATER_Q1   = 1,
-   FAN_HEAT_Q2 = 2,
-   HUMIF_Q3    = 3,
-   FAN_EXT_Q4  = 4,
-
-   AMUX_0_Q5   = 5,
-   AMUX_1_Q6   = 6,
-   AMUX_2_Q7   = 7,
-};
 
 // Internal mock state of the shift register outputs
-byte current_sr_bits = 0;
+static byte current_sr_bits = 0xFF;
 
 // In the mock, this is a pure no-op for hardware, used only for logging if needed
-inline void updateShiftRegister() {
+void updateShiftRegister() {
    // No real hardware interaction here to keep tests safe
    ESP_LOGD(M_SHIFT_REGISTER_H_TAG, "Mock updateShiftRegister called, bits=0b%08b", current_sr_bits);
 }
 
-inline void setAllOutputs(bool state){
+void setAllOutputs(bool state){
    current_sr_bits = (state ? 0b11111111 : 0);
    updateShiftRegister();
 }
 
-inline void setDevice(Device dev, bool state) {
+void setDevice(Device dev, bool state) {
    state ? bitSet(current_sr_bits, dev) : bitClear(current_sr_bits, dev);
    updateShiftRegister();
 
@@ -50,7 +31,7 @@ inline void setDevice(Device dev, bool state) {
    }
 }
 
-inline void setAmuxChannel(byte channel) {
+void setAmuxChannel(byte channel) {
    if (channel > 7){
       ESP_LOGW(M_SHIFT_REGISTER_H_TAG, "Mock: invalid analog mux channel specified! (%d)", channel);
       return;
@@ -70,7 +51,7 @@ inline void setAmuxChannel(byte channel) {
 }
 
 // Mock init: do NOT touch real pins, just reset internal state
-inline void initShiftRegister() {
+void initShiftRegister() {
    current_sr_bits = 0b11111111;
    updateShiftRegister();
    ESP_LOGI(M_SHIFT_REGISTER_H_TAG, "Mock shift register setup: all outputs DISABLED (high in mock state)");

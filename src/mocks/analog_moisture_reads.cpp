@@ -1,15 +1,16 @@
-#pragma once
+constexpr static const char* TAG = "ANALOG_MOISTURE_READS_MOCK.CPP";
 #include <Arduino.h>
 #include "pins.h"
+#include "analog_moisture_reads.h"
 /*VERSIONE MOCK*/
 
 
 // Valori di calibrazione (variano da sensore a sensore)
-const int AIR_VALUE = 3200;   // Valore letto all'aria (completamente asciutto)
-const int WATER_VALUE = 1500; // Valore letto in un bicchiere d'acqua (massima umidità)
+static const int AIR_VALUE = 3200;   // Valore letto all'aria (completamente asciutto)
+static const int WATER_VALUE = 1500; // Valore letto in un bicchiere d'acqua (massima umidità)
 
-
-inline int readMoisture() {
+//restituisce il tutto scannando
+int readMoisture_single() {
     // 1. Leggi il valore analogico grezzo (0-4095 su ESP32)
     // int rawValue = analogRead(MOIST_AOUT_PIN); // TODO: riabilitare quando si usa il sensore reale
 
@@ -25,4 +26,8 @@ inline int readMoisture() {
     percentage = constrain(percentage, 0, 100);
 
     return percentage;
+}
+
+int readMoisture_scan() {
+    return readMoisture_single();
 }

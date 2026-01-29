@@ -1,3 +1,4 @@
+constexpr static const char* MAIN_CPP_TAG = "MAIN.CPP/SETUP";
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -6,23 +7,26 @@
 #include <PubSubClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+
 #include "config.h"
-#include "types.h"
-#include "pins.h"
+#include "common_hw.h"
 
-#include "mocks/i2c_temp_hum_reads.h"
-#include "mocks/camera.h"
-#include "mocks/shift_register.h"
 #include "deep_sleep.h"
+#include "main.h"
 
-static const char* MAIN_CPP_TAG = "MAIN.CPP/SETUP";
+#define BIT_FIRE       (1 << 1)
+#define BIT_COMMS_DONE (1 << 0)
+
+//prototipi
+void execute_fire_protocol();
+void taskMango(void *pvParameters);
+void taskComms(void *pvParameters);
+
 // Globals for Task Coordination
 QueueHandle_t dataQueue;
 EventGroupHandle_t syncBits;
-#define BIT_COMMS_DONE (1 << 0)
 
 //ISR e flag per fuoco
-#define BIT_FIRE        (1 << 1)
 volatile RTC_NOINIT_ATTR bool fire_reboot_triggered;
 void IRAM_ATTR fire_isr() {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -37,11 +41,6 @@ void IRAM_ATTR fire_isr() {
         portYIELD_FROM_ISR();
     }
 }
-
-//prototipi
-void execute_fire_protocol();
-void taskMango(void *pvParameters);
-void taskComms(void *pvParameters);
 
 void setup() {
     Serial.begin(115200);
@@ -65,11 +64,12 @@ void setup() {
     }
     
     
-    //impostiamo pin acuqa e fuoco e mettiamo l'interrupt che setta flag reboot fuoco durante la fase "da sveglio"
+    //impostiamo pin acuqa, fuoco e ingresso analog (moisture) e mettiamo l'interrupt che setta flag reboot fuoco durante la fase "da sveglio"
     rtc_gpio_hold_dis((gpio_num_t)WAKE_PIN); //sblocca il pin che era stato attaccato all'rtc deep sleep per accesso durante la veglia
     pinMode(WAKE_PIN, INPUT_PULLDOWN);
     attachInterrupt(digitalPinToInterrupt(WAKE_PIN), fire_isr, RISING);
-    pinMode(FLOAT_SWITCH_PIN,INPUT_PULLUP);    
+    pinMode(FLOAT_SWITCH_PIN,INPUT_PULLUP);
+    pinMode(MOIST_AOUT_PIN,INPUT);    
 
     i2c_setup();
     init_camera_system();
@@ -107,7 +107,7 @@ void setup() {
     }
 
     //5. Hold fire pin and Sleep again
-    deep_sleep_setup(10);
+    deep_sleep_setup(SLEEP_FIXED_DURATION);
     esp_deep_sleep_start();
 
 }
