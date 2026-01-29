@@ -4,6 +4,7 @@
 #include "pins.h"
 
 #include "taskPwm.h"
+#include "i2c_io_expander.h"
 #include "i2c_temp_hum_reads.h"
 #include "analog_moisture_reads.h"
 #include "camera.h"

@@ -20,7 +20,7 @@ uint8_t i2c_mux_select_bus(uint8_t bus){
   return error_code;
 }
 
-//inzializza tutti i sensori sul mux, da chiamare al setup
+//inzializza la comunicazione i2c e tutti i sensori sul mux, da chiamare al setup
 void i2c_setup() {
   Wire.begin(SDA_PIN,SCL_PIN);
 
