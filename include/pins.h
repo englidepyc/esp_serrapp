@@ -1,4 +1,9 @@
 #pragma once
+//PWM E ATTUAZIONI (ex shift register)
+#define HEATER_PWM_PIN 47
+#define HEATER_FAN_PIN 21
+#define HUMIF_PWM_PIN 19
+
 //SHIFT REGISTER
 #define DATA_PIN 47   // DS
 #define LATCH_PIN 21  // ST_CP

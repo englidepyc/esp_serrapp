@@ -3,7 +3,10 @@
 #include "types.h"
 #include "pins.h"
 
+#include "taskPwm.h"
 #include "i2c_temp_hum_reads.h"
-#include "shift_register.h"
 #include "analog_moisture_reads.h"
 #include "camera.h"
+
+//TODO: togliere
+#include "shift_register.h"

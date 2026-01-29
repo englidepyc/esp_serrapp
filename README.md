@@ -10,6 +10,8 @@ Quando sei soddisfatto di avere sviluppato la tua piccola funzionalità nel tuo 
 ## Interfaccia hardware
 I sensori e gli attuatori sono gestiti da interfacce hardware implementate in `src/real`. E' possibile cambiare l'environment PlatformIO da `release` a `test` per passare dalle vere implementazioni a quelle nella cartella `src/mocks` per sviluppare e testare senza hardware effettivo, non toccando i pin della board per evitare corti e malfunzionamenti, specialmente quando si settano i pin in modalità OUTPUT.
 
+- E' NECESSARIO chiamare sempre come sicurezza dal fuoco `pwmSetup()` nel `src/main.cpp`
+
 - E' NECESSARIO impostare correttamente come INPUT con `pinMode()` i pin di input del GALLEGGIANTE del serbatoio, del risveglio dal sesnore FUOCO e delle letture analogiche dell'acqua nel TERRENO, nell'apposita sezione di `setup()` nel `src/main.cpp`.
 
 - E' NECSSARIO chiamare anche i vari metodi di setup delle restanti interfacce hardware, che inizializzano e testano le comunicazioni e impostano correttamente i pin. Questi sono `i2c_setup()` e `init_camera_system()`

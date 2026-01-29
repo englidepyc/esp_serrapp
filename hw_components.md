@@ -4,15 +4,16 @@
 - float switch (interrupt)
 - Fire infrared photo diode
 # Actuators
+(4 relays)
 - Water pump
 - Fan (to extract humidity)
 - Heater (connected to the single SSR relay)
 - Humidifier (on/off analog)
 # Utilities
-- TCA9548A (I2C mux)
-- CD74HC4067 (Analog mux)
-- SN74HC595N (shift register)
-- 4 relays (one SSR that is connected to the heater)
+- TCA9548A (I2C mux) 8 uscite selezionabili con i2c
+- CD74HC4067 (Analog mux) 16 uscite selezionabili coi pin S0-S3 (no i2c)
+- io expander PCF8574 8 canali
+- SN74HC595N (shift register) (rip ✝)
 # ESP32-S3 pinout
 0-3,14,19,20,41,42,45-48,21 (free)
 38,39,40 (sd card)

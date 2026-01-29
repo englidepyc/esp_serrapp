@@ -1,4 +1,5 @@
 constexpr static const char* MAIN_CPP_TAG = "MAIN.CPP/SETUP";
+#include "main.h"
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -10,23 +11,13 @@ constexpr static const char* MAIN_CPP_TAG = "MAIN.CPP/SETUP";
 
 #include "config.h"
 #include "common_hw.h"
-
 #include "deep_sleep.h"
-#include "main.h"
-
-#define BIT_FIRE       (1 << 1)
-#define BIT_COMMS_DONE (1 << 0)
-
-//prototipi
-void execute_fire_protocol();
-void taskMango(void *pvParameters);
-void taskComms(void *pvParameters);
 
 // Globals for Task Coordination
 QueueHandle_t dataQueue;
 EventGroupHandle_t syncBits;
 
-//ISR e flag per fuoco
+//ISR, flag per fuoco e pwm riscaldatore
 volatile RTC_NOINIT_ATTR bool fire_reboot_triggered;
 void IRAM_ATTR fire_isr() {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -41,12 +32,13 @@ void IRAM_ATTR fire_isr() {
         portYIELD_FROM_ISR();
     }
 }
+volatile int targetPower = 0;
 
 void setup() {
     Serial.begin(115200);
     esp_log_level_set("*", ESP_LOG_DEBUG);
-    
-    initShiftRegister(); //prima cosa spegnere sempre il relé (sicurezza)
+
+    pwmSetup(); //sempre impostiamo i pin del riscaldatore spenti (RELAY_OFF) per sicurezza come prima cosa e inizializziamo i pin
 
     // Inizializzazioni variabili RTC al primo avvio
     if (esp_reset_reason() == ESP_RST_POWERON) {
@@ -69,7 +61,7 @@ void setup() {
     pinMode(WAKE_PIN, INPUT_PULLDOWN);
     attachInterrupt(digitalPinToInterrupt(WAKE_PIN), fire_isr, RISING);
     pinMode(FLOAT_SWITCH_PIN,INPUT_PULLUP);
-    pinMode(MOIST_AOUT_PIN,INPUT);    
+    pinMode(MOIST_AOUT_PIN,INPUT_PULLUP);    
 
     i2c_setup();
     init_camera_system();
@@ -82,6 +74,7 @@ void setup() {
     // 3. Launch Workers
     xTaskCreatePinnedToCore(taskMango,  "Mango",  8192, NULL, 1, NULL, 1);
     xTaskCreatePinnedToCore(taskComms, "Comms", 8192, NULL, 1, NULL, 0);
+    xTaskCreatePinnedToCore(taskSSR, "SSR", 1024, (void*)(intptr_t)HEATER_PWM_PIN, 1, NULL, 1);
 
     ESP_LOGI(MAIN_CPP_TAG,"Task creation called!");
 
@@ -97,7 +90,7 @@ void setup() {
 
     if ((bits & BIT_FIRE) != 0) {
         // CASE A: FIRE DETECTED
-        ESP_LOGE(MAIN_CPP_TAG, "Wakeup caused by FIRE BIT! Rebooting...");
+        ESP_LOGE(MAIN_CPP_TAG, "FIRE BIT detected WHILE WORKING! Rebooting...");
         fire_reboot_triggered = true;
         esp_restart();
     } 
