@@ -17,7 +17,7 @@ constexpr static const char* MAIN_CPP_TAG = "MAIN.CPP/SETUP";
 QueueHandle_t dataQueue;
 EventGroupHandle_t syncBits;
 
-//ISR, flag per fuoco e pwm riscaldatore
+//ISR, flag per fuoco
 volatile RTC_NOINIT_ATTR bool fire_reboot_triggered;
 void IRAM_ATTR fire_isr() {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -32,7 +32,10 @@ void IRAM_ATTR fire_isr() {
         portYIELD_FROM_ISR();
     }
 }
-volatile int targetPower = 0;
+
+//PWM
+volatile int PWM_HEATER_POW = 0;
+volatile int PWM_HUMIF_POW = 0;
 
 void setup() {
     Serial.begin(115200);
@@ -74,7 +77,9 @@ void setup() {
     // 3. Launch Workers
     xTaskCreatePinnedToCore(taskMango,  "Mango",  8192, NULL, 1, NULL, 1);
     xTaskCreatePinnedToCore(taskComms, "Comms", 8192, NULL, 1, NULL, 0);
-    xTaskCreatePinnedToCore(taskSSR, "SSR", 1024, (void*)(intptr_t)HEATER_PWM_PIN, 1, NULL, 1);
+    
+    xTaskCreatePinnedToCore(taskPWM, "PWM_Heater", 1024, (void*)(intptr_t)HEATER_PWM_PIN, 1, NULL, 1);
+    xTaskCreatePinnedToCore(taskPWM, "PWM_Humif", 1024, (void*)(intptr_t)HUMIF_PWM_PIN, 1, NULL, 1);
 
     ESP_LOGI(MAIN_CPP_TAG,"Task creation called!");
 

@@ -5,7 +5,8 @@
 // 0x20 è standard per il chip PCF8574 (Texas Instruments/NXP)
 // 0x3F è standard per il chip PCF8574A (o molti moduli cinesi con display LCD)
 // Controlla con un I2C scanner se non funziona!
-#define PCF_ADDR 0x20 
+#define PCF_ADDR 0x20
+#define PCF_MUX_CHANNEL 4 
 
 enum Device : byte {
    PUMP_P0     = 0,

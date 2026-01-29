@@ -2,6 +2,7 @@
 #include <Wire.h>
 #include "pins.h"
 #include "i2c_io_expander.h"
+#include "i2c_mux_and_sensor_reads.h"
 
 
 constexpr static const char* IO_EXP_TAG = "IO_EXPANDER";
@@ -24,6 +25,7 @@ void _writePCF(byte data) {
 }
 
 void updateIOExpander() {
+    i2c_mux_select_bus(PCF_MUX_CHANNEL);
     _writePCF(_port_state);
 }
 
@@ -81,12 +83,8 @@ void setAmuxChannel(byte channel) {
    ESP_LOGD(IO_EXP_TAG, "Mux analogico settato sul canale %d (Raw: 0x%02X)", channel, _port_state);
 }
 
-void initIOExpander() {
-    // Inizializza il bus I2C. 
-    // Assicurati di aver chiamato Wire.setPins(sda, scl) prima se usi pin custom su ESP32
-    Wire.begin(); 
-
-    // Reset iniziale: Tutto HIGH (Relè Spenti)
+// Reset iniziale: Tutto HIGH (Relè Spenti)
+void resetIOExpander() {
     _port_state = 0xFF;
     updateIOExpander();
     

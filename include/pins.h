@@ -4,13 +4,13 @@
 
 //PWM E ATTUAZIONI (ex shift register)
 #define HEATER_PWM_PIN 47
-#define HEATER_FAN_PIN 21
+#define FAN_HEATER_PIN 21
 #define HUMIF_PWM_PIN 19
 
-//TODO: Togliere SHIFT REGISTER
+/* //SHIFT REGISTER
 #define DATA_PIN 47   // DS
 #define LATCH_PIN 21  // ST_CP
-#define CLOCK_PIN 19 // SH_CP
+#define CLOCK_PIN 19 // SH_CP */
 
 //AOUT dal mux analogico per i sensori umidità terreno
 #define MOIST_AOUT_PIN 1

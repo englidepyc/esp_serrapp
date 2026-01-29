@@ -8,4 +8,4 @@ constexpr static int SLEEP_FIXED_DURATION = 600;
 void execute_fire_protocol();
 void taskMango(void *pvParameters);
 void taskComms(void *pvParameters);
-void taskSSR(void* pvParameters);
+void taskPWM(void* pvParameters);

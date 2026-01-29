@@ -5,7 +5,7 @@ constexpr static const char* I2C_TEMP_HUM_READS_H_TAG = "I2C_TEMP_HUM_READS.CPP"
 #include <Adafruit_AHTX0.h> // Library for AHT20
 #include <Adafruit_BMP280.h> // Library for BMP280
 #include "pins.h"
-#include "i2c_temp_hum_reads.h"
+#include "i2c_mux_and_sensor_reads.h"
 
 static Adafruit_AHTX0 _aht;
 static sensors_event_t _humidity, _temp;
