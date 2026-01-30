@@ -5,7 +5,7 @@ constexpr static const char* TAG = "ANALOG_MOISTURE_READS_MOCK.CPP";
 /*VERSIONE MOCK*/
 
 //restituisce il tutto scannando
-int readMoisture_single() {
+int readMoisture_single(uint8_t analog_channel) {
     // 1. Leggi il valore analogico grezzo (0-4095 su ESP32)
     // int rawValue = analogRead(MOIST_AOUT_PIN); // TODO: riabilitare quando si usa il sensore reale
 
@@ -24,5 +24,5 @@ int readMoisture_single() {
 }
 
 int readMoisture_scan() {
-    return readMoisture_single();
+    return readMoisture_single(2);
 }
