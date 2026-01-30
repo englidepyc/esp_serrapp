@@ -4,13 +4,8 @@ constexpr static const char* TAG = "ANALOG_MOISTURE_READS_MOCK.CPP";
 #include "analog_moisture_reads.h"
 /*VERSIONE MOCK*/
 
-
-// Valori di calibrazione (variano da sensore a sensore)
-static const int AIR_VALUE = 3200;   // Valore letto all'aria (completamente asciutto)
-static const int WATER_VALUE = 1500; // Valore letto in un bicchiere d'acqua (massima umidità)
-
 //restituisce il tutto scannando
-int readMoisture_single() {
+int readMoisture_single(uint8_t analog_channel) {
     // 1. Leggi il valore analogico grezzo (0-4095 su ESP32)
     // int rawValue = analogRead(MOIST_AOUT_PIN); // TODO: riabilitare quando si usa il sensore reale
 
@@ -29,5 +24,5 @@ int readMoisture_single() {
 }
 
 int readMoisture_scan() {
-    return readMoisture_single();
+    return readMoisture_single(2);
 }

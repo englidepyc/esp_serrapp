@@ -1,4 +1,6 @@
 extern const char* TASKS_CPP_MANGO_TAG;
+#include <Arduino.h>
+#include "pins.h"
 #include "common_hw.h"
 #include "control/proportional.h"
 
@@ -15,11 +17,11 @@ void proportional_actuation(GardenMessage* msg) {
 
         ESP_LOGI(TASKS_CPP_MANGO_TAG, "Heating: Error %.2fC -> %ld ms", error_temp, heat_duration);
 
-        setDevice(FAN_HEAT_Q2, ON_R); 
-        setDevice(HEATER_Q1, ON_R);
+        digitalWrite(FAN_HEATER_PIN, RELAY_ON); 
+        PWM_HEATER_POW = 100;
         vTaskDelay(pdMS_TO_TICKS(heat_duration)); 
-        setDevice(HEATER_Q1, OFF_R);
-        setDevice(FAN_HEAT_Q2, OFF_R);
+        PWM_HEATER_POW = 0;
+        digitalWrite(FAN_HEATER_PIN, RELAY_OFF);
         
         msg->isActuated = true;
         is_heating = true; // Mark this so we know we just dried the air further
@@ -27,9 +29,9 @@ void proportional_actuation(GardenMessage* msg) {
     else if (msg->temp > (TARGET_TEMP_DAY + 2.0)) {
         // Venting logic (Bang-Bang)
         ESP_LOGW(TASKS_CPP_MANGO_TAG, "Temp High. Venting.");
-        setDevice(FAN_EXT_Q4, ON_R);
+        setDevice(FAN_EXT_P1, RELAY_ON);
         vTaskDelay(pdMS_TO_TICKS(30000)); 
-        setDevice(FAN_EXT_Q4, OFF_R);
+        setDevice(FAN_EXT_P1, RELAY_OFF);
         msg->isActuated = true;
     }
 
@@ -48,16 +50,16 @@ void proportional_actuation(GardenMessage* msg) {
 
         ESP_LOGI(TASKS_CPP_MANGO_TAG, "Air Dry (VPD %.2f). Misting for %ld ms", msg->vpd, mist_duration);
 
-        setDevice(HUMIF_Q3, ON_R);
+        PWM_HUMIF_POW = 100;
         
         // If we are misting, it's good to run the internal fan to disperse it
         // (Optional, depends on your wiring)
-        setDevice(FAN_EXT_Q4, ON_R); 
+        setDevice(FAN_EXT_P1, RELAY_ON); 
         
         vTaskDelay(pdMS_TO_TICKS(mist_duration));
         
-        setDevice(HUMIF_Q3, OFF_R);
-        setDevice(FAN_EXT_Q4, OFF_R);
+        PWM_HUMIF_POW = 0;
+        setDevice(FAN_EXT_P1, RELAY_OFF);
         
         msg->isActuated = true;
     }
@@ -65,18 +67,18 @@ void proportional_actuation(GardenMessage* msg) {
     else if (msg->vpd < 0.4) {
         // 0.4 kPa is "Swampy". Risk of Mold.
         ESP_LOGW(TASKS_CPP_MANGO_TAG, "VPD Low (Swampy). Pulse Venting.");
-        setDevice(FAN_EXT_Q4, ON_R);
+        setDevice(FAN_EXT_P1, RELAY_ON);
         vTaskDelay(pdMS_TO_TICKS(15000)); // Short burst to exchange air
-        setDevice(FAN_EXT_Q4, OFF_R);
+        setDevice(FAN_EXT_P1, RELAY_OFF);
         msg->isActuated = true;
     }
 
     // --- PHASE 3: WATERING ---
     if (!msg->isWaterOver && msg->moisture < THRESH_SOIL_DRY) {
         ESP_LOGI(TASKS_CPP_MANGO_TAG, "Watering Pulse.");
-        setDevice(PUMP_Q0, ON_R);
+        setDevice(PUMP_P0, RELAY_ON);
         vTaskDelay(pdMS_TO_TICKS(PUMP_DURATION_MS));
-        setDevice(PUMP_Q0, OFF_R);
+        setDevice(PUMP_P0, RELAY_OFF);
         msg->isActuated = true;
     }else if(msg->isWaterOver){
         ESP_LOGE(TASKS_CPP_MANGO_TAG, "Water tank depleted! Impossible to water plants!");

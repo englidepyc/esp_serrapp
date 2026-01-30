@@ -3,8 +3,12 @@ constexpr static const char* TAG = "ANALOG_MOISTURE_READS.CPP";
 #include <Arduino.h>
 #include "pins.h"
 #include "analog_moisture_reads.h"
+#include "i2c_io_expander.h"
 
-int readMoisture_single() {
+int readMoisture_single(uint8_t analog_channel) {
+    //scegli il canale dal mux analogico
+    setAmuxChannel(analog_channel);
+
     // 1. Leggi il valore analogico grezzo (0-4095 su ESP32)
     int rawValue = analogRead(MOIST_AOUT_PIN);
 
@@ -19,5 +23,17 @@ int readMoisture_single() {
 }
 
 int readMoisture_scan() {
-    return readMoisture_single();
+    int sum = 0;
+    
+    // Leggi tutti i sensori definiti in ANALOG_SENSORS_QTY
+    for (uint8_t i = 0; i < ANALOG_SENSORS_QTY; i++) {
+        int reading = readMoisture_single(i);
+        sum += reading;
+        
+        // Piccolo delay per stabilizzazione tra letture successive
+        delayMicroseconds(500);
+    }
+    
+    // Calcola e restituisci la media
+    return sum / ANALOG_SENSORS_QTY;
 }

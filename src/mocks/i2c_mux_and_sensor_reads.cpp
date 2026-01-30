@@ -5,7 +5,7 @@ constexpr static const char* M_I2C_TEMP_HUM_READS_H_TAG = "MOCK/I2C_TEMP_HUM_REA
 #include <Adafruit_AHTX0.h> // Library for AHT20
 #include <Adafruit_BMP280.h> // Library for BMP280
 #include "pins.h"
-#include "i2c_temp_hum_reads.h"
+#include "i2c_mux_and_sensor_reads.h"
 
 //TCA9548A
 uint8_t i2c_mux_select_bus(uint8_t bus){
