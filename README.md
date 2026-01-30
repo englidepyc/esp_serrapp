@@ -7,6 +7,7 @@ I branch `feat/` sono fatti a partire dal develop e implementano piccole funzion
 Quando sei soddisfatto di avere sviluppato la tua piccola funzionalità nel tuo branch `feat/`, caricalo con `git push --set-upstream origin feat/tua_funzionalita`.
 <br> Poi disctuiamo e proviamo e lo integriamo nel branch `develop`
 # Documentazione
+La board custom è presa dal link [https://github.com/handledexception/platform-espressif32/blob/esp32-s3-devkitc-1-n16r8v/boards/esp32-s3-devkitc-1-n16r8v.json]
 ## Interfaccia hardware
 I sensori e gli attuatori sono gestiti da interfacce hardware implementate in `src/real`. E' possibile cambiare l'environment PlatformIO da `release` a `test` per passare dalle vere implementazioni a quelle nella cartella `src/mocks` per sviluppare e testare senza hardware effettivo, non toccando i pin della board per evitare corti e malfunzionamenti, specialmente quando si settano i pin in modalità OUTPUT.
 
