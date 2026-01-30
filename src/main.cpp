@@ -11,6 +11,7 @@ constexpr static const char* MAIN_CPP_TAG = "MAIN.CPP/SETUP";
 
 #include "config.h"
 #include "common_hw.h"
+#include "camera.h"
 #include "deep_sleep.h"
 
 // Globals for Task Coordination
