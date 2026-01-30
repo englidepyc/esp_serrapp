@@ -1,167 +1,183 @@
-/**
- * ESP32-S3 Memory Test
- * Board: ESP32-S3-DevKitC-1-N16R8V
- * - 16 MB Flash (QIO mode)
- * - 8 MB PSRAM (OPI mode)
- * - 512 KB SRAM (320 KB disponibili)
- */
-
+constexpr static const char* MAIN_CPP_TAG = "MAIN.CPP/SETUP";
+#include "main.h"
 #include <Arduino.h>
-#include <esp_log.h>
-#include <esp_system.h>
-#include <esp_heap_caps.h>
-#include <esp_partition.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/queue.h>
+#include <freertos/event_groups.h>
+#include <PubSubClient.h>
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
 
-static const char* TAG = "MEMORY_TEST";
+#include "config.h"
+#include "common_hw.h"
+#include "camera.h"
+#include "deep_sleep.h"
 
-void test_sram() {
-    ESP_LOGI(TAG, "=== SRAM INTERNA TEST ===");
+// Globals for Task Coordination
+QueueHandle_t dataQueue;
+EventGroupHandle_t syncBits;
+
+//ISR, flag per fuoco
+volatile RTC_NOINIT_ATTR bool fire_reboot_triggered;
+void IRAM_ATTR fire_isr() {
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     
-    // Informazioni heap interno (SRAM)
-    multi_heap_info_t info;
-    heap_caps_get_info(&info, MALLOC_CAP_INTERNAL);
-    
-    ESP_LOGI(TAG, "SRAM Heap:");
-    ESP_LOGI(TAG, "  - Totale disponibile: %u bytes (%.2f KB)", 
-             info.total_free_bytes, info.total_free_bytes / 1024.0);
-    ESP_LOGI(TAG, "  - Blocco più grande: %u bytes (%.2f KB)", 
-             info.largest_free_block, info.largest_free_block / 1024.0);
-    ESP_LOGI(TAG, "  - Minimo mai disponibile: %u bytes", 
-             info.minimum_free_bytes);
-    
-    // Test allocazione SRAM
-    size_t test_size = 10240; // 10 KB
-    void* test_ptr = heap_caps_malloc(test_size, MALLOC_CAP_INTERNAL);
-    if (test_ptr) {
-        ESP_LOGI(TAG, "  ✓ Allocati %u bytes in SRAM con successo", test_size);
-        memset(test_ptr, 0xAA, test_size);
-        ESP_LOGI(TAG, "  ✓ Test scrittura completato");
-        heap_caps_free(test_ptr);
-    } else {
-        ESP_LOGE(TAG, "  ✗ Allocazione SRAM fallita!");
+    // Set the FIRE bit from the ISR
+    if (syncBits != NULL) {
+        xEventGroupSetBitsFromISR(syncBits, BIT_FIRE, &xHigherPriorityTaskWoken);
+    }
+
+    // Force context switch if setup() was waiting for this
+    if (xHigherPriorityTaskWoken) {
+        portYIELD_FROM_ISR();
     }
 }
 
-void test_psram() {
-    ESP_LOGI(TAG, "=== PSRAM (OPI) TEST ===");
-    
-    // Verifica presenza PSRAM
-    if (!psramFound()) {
-        ESP_LOGE(TAG, "  ✗ PSRAM NON TROVATA!");
-        return;
-    }
-    
-    ESP_LOGI(TAG, "  ✓ PSRAM rilevata");
-    
-    // Informazioni PSRAM
-    size_t psram_size = ESP.getPsramSize();
-    ESP_LOGI(TAG, "  - Dimensione totale: %u bytes (%.2f MB)", 
-             psram_size, psram_size / (1024.0 * 1024.0));
-    
-    multi_heap_info_t info;
-    heap_caps_get_info(&info, MALLOC_CAP_SPIRAM);
-    
-    ESP_LOGI(TAG, "PSRAM Heap:");
-    ESP_LOGI(TAG, "  - Disponibile: %u bytes (%.2f MB)", 
-             info.total_free_bytes, info.total_free_bytes / (1024.0 * 1024.0));
-    ESP_LOGI(TAG, "  - Blocco più grande: %u bytes (%.2f MB)", 
-             info.largest_free_block, info.largest_free_block / (1024.0 * 1024.0));
-    
-    // Test allocazione grosso buffer in PSRAM
-    size_t test_size = 1024 * 1024; // 1 MB
-    void* test_ptr = heap_caps_malloc(test_size, MALLOC_CAP_SPIRAM);
-    if (test_ptr) {
-        ESP_LOGI(TAG, "  ✓ Allocati %u bytes (1 MB) in PSRAM", test_size);
-        
-        // Test scrittura/lettura
-        uint8_t* data = (uint8_t*)test_ptr;
-        for (size_t i = 0; i < test_size; i += 1024) {
-            data[i] = (i / 1024) & 0xFF;
-        }
-        ESP_LOGI(TAG, "  ✓ Test scrittura completato");
-        
-        // Verifica
-        bool verify_ok = true;
-        for (size_t i = 0; i < test_size; i += 1024) {
-            if (data[i] != ((i / 1024) & 0xFF)) {
-                verify_ok = false;
-                break;
-            }
-        }
-        
-        if (verify_ok) {
-            ESP_LOGI(TAG, "  ✓ Test lettura/verifica completato");
-        } else {
-            ESP_LOGE(TAG, "  ✗ Errore verifica dati!");
-        }
-        
-        heap_caps_free(test_ptr);
-    } else {
-        ESP_LOGE(TAG, "  ✗ Allocazione PSRAM fallita!");
-    }
-}
-
-void test_flash() {
-    ESP_LOGI(TAG, "=== FLASH (QIO) TEST ===");
-    
-    // Dimensione totale flash
-    uint32_t flash_size = ESP.getFlashChipSize();
-    ESP_LOGI(TAG, "Flash totale:");
-    ESP_LOGI(TAG, "  - Dimensione: %u bytes (%.2f MB)", 
-             flash_size, flash_size / (1024.0 * 1024.0));
-    
-    // Modalità e velocità flash
-    ESP_LOGI(TAG, "  - Modalità configurata: QIO (Quad I/O)");
-    ESP_LOGI(TAG, "  - Frequenza: %u MHz", ESP.getFlashChipSpeed() / 1000000);
-    
-    // Sketch info
-    ESP_LOGI(TAG, "Sketch:");
-    ESP_LOGI(TAG, "  - Dimensione: %u bytes (%.2f KB)", 
-             ESP.getSketchSize(), ESP.getSketchSize() / 1024.0);
-    ESP_LOGI(TAG, "  - Spazio libero: %u bytes (%.2f KB)", 
-             ESP.getFreeSketchSpace(), ESP.getFreeSketchSpace() / 1024.0);
-    
-    // Test lettura flash
-    const char* test_string = "ESP32-S3 Flash Test";
-    ESP_LOGI(TAG, "  ✓ Test lettura dati da flash: '%s'", test_string);
-}
-
-void print_system_info() {
-    ESP_LOGI(TAG, "=== INFORMAZIONI SISTEMA ===");
-    ESP_LOGI(TAG, "Chip: %s", ESP.getChipModel());
-    ESP_LOGI(TAG, "Revisione: %d", ESP.getChipRevision());
-    ESP_LOGI(TAG, "CPU Cores: %d", ESP.getChipCores());
-    ESP_LOGI(TAG, "CPU Freq: %u MHz", ESP.getCpuFreqMHz());
-    ESP_LOGI(TAG, "SDK Version: %s", ESP.getSdkVersion());
-    ESP_LOGI(TAG, "");
-}
+//PWM
+volatile int PWM_HEATER_POW = 0;
+volatile int PWM_HUMIF_POW = 0;
 
 void setup() {
     Serial.begin(115200);
-    delay(1000); // Aspetta stabilizzazione seriale
+    esp_log_level_set("*", ESP_LOG_DEBUG);
+
+    pwmSetup(); //sempre impostiamo i pin del riscaldatore spenti (RELAY_OFF) per sicurezza come prima cosa e inizializziamo i pin
+
+    // Inizializzazioni variabili RTC al primo avvio
+    if (esp_reset_reason() == ESP_RST_POWERON) {
+        fire_reboot_triggered = false;
+        ESP_LOGI(MAIN_CPP_TAG, "Cold Boot. System Clean.");
+    }
     
-    ESP_LOGI(TAG, "\n\n╔════════════════════════════════════════╗");
-    ESP_LOGI(TAG, "║  ESP32-S3 MEMORY TEST SUITE           ║");
-    ESP_LOGI(TAG, "║  Board: ESP32-S3-DevKitC-1-N16R8V     ║");
-    ESP_LOGI(TAG, "╚════════════════════════════════════════╝\n");
+    // Se necessario, entra in modalità fuoco (rilevato durante lo sleep o reboot da sveglio)
+    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+    print_wakeup_reason(wakeup_reason);
+    if (wakeup_reason == FIRE_EXT1_WAKEUP || fire_reboot_triggered) {
+        // Ensure flag is set for the NEXT loop if we crash
+        fire_reboot_triggered = true; 
+        execute_fire_protocol();
+    }
     
-    print_system_info();
     
-    test_sram();
-    ESP_LOGI(TAG, "");
+    //impostiamo pin acuqa, fuoco e ingresso analog (moisture) e mettiamo l'interrupt che setta flag reboot fuoco durante la fase "da sveglio"
+    rtc_gpio_hold_dis((gpio_num_t)WAKE_PIN); //sblocca il pin che era stato attaccato all'rtc deep sleep per accesso durante la veglia
+    pinMode(WAKE_PIN, INPUT_PULLDOWN);
+    attachInterrupt(digitalPinToInterrupt(WAKE_PIN), fire_isr, RISING);
+    pinMode(FLOAT_SWITCH_PIN,INPUT_PULLUP);
+    pinMode(MOIST_AOUT_PIN,INPUT_PULLUP);    
+
+    i2c_setup();
+    init_camera_system();
+
     
-    test_psram();
-    ESP_LOGI(TAG, "");
+    // 2. Create RTOS Objects
+    dataQueue = xQueueCreate(5, sizeof(GardenMessage));
+    syncBits = xEventGroupCreate();
+
+    // 3. Launch Workers
+    xTaskCreatePinnedToCore(taskMango,  "Mango",  8192, NULL, 1, NULL, 1);
+    xTaskCreatePinnedToCore(taskComms, "Comms", 8192, NULL, 1, NULL, 0);
     
-    test_flash();
-    ESP_LOGI(TAG, "");
-    
-    ESP_LOGI(TAG, "╔════════════════════════════════════════╗");
-    ESP_LOGI(TAG, "║  TEST COMPLETATO                      ║");
-    ESP_LOGI(TAG, "╚════════════════════════════════════════╝");
+    xTaskCreatePinnedToCore(taskPWM, "PWM_Heater", 1024, (void*)(intptr_t)HEATER_PWM_PIN, 1, NULL, 1);
+    xTaskCreatePinnedToCore(taskPWM, "PWM_Humif", 1024, (void*)(intptr_t)HUMIF_PWM_PIN, 1, NULL, 1);
+
+    ESP_LOGI(MAIN_CPP_TAG,"Task creation called!");
+
+
+    //Aspetto che finiscono le comunicazioni oppure il fuoco
+    EventBits_t bits = xEventGroupWaitBits(
+        syncBits, 
+        BIT_COMMS_DONE | BIT_FIRE, // Watch for these bits
+        pdFALSE,                   // Clear bits on exit? (False: we want to read them)
+        pdFALSE,                   // WaitForAllBits? FALSE = "OR" Logic (Wake on ANY)
+        portMAX_DELAY              // Block forever until one happens
+    );
+
+    if ((bits & BIT_FIRE) != 0) {
+        // CASE A: FIRE DETECTED
+        ESP_LOGE(MAIN_CPP_TAG, "FIRE BIT detected WHILE WORKING! Rebooting...");
+        fire_reboot_triggered = true;
+        esp_restart();
+    } 
+    else if ((bits & BIT_COMMS_DONE) != 0) {
+        // CASE B: NORMAL COMPLETION
+        ESP_LOGI(MAIN_CPP_TAG, "Tasks finished normally. Sleeping.");
+    }
+
+    //5. Hold fire pin and Sleep again
+    deep_sleep_setup(SLEEP_FIXED_DURATION);
+    esp_deep_sleep_start();
+
 }
 
-void loop() {
-    // Niente da fare nel loop
-    delay(10000);
+void loop() {}
+
+void execute_fire_protocol() {
+    //TODO: Testare e mettere se necessario un topic a parte
+    // --- 1. LOCAL EMERGENCY OBJECTS ---
+    WiFiClientSecure fireEspClient;
+    PubSubClient fireMqttClient(fireEspClient);
+
+    ESP_LOGE("FIRE", "!!! FIRE PROTOCOL INITIATED !!!");
+
+    // Safety: Kill relays immediately
+    // write_shift_register(0x00); 
+
+    WiFi.mode(WIFI_STA);
+    fireEspClient.setInsecure(); // Skip certs for speed
+    fireMqttClient.setServer(MQTT_BROKER, MQTT_PORT);
+
+    String clientId = "ESP32-FIRE-" + String(random(0xffff), HEX);
+    long lastPub = 0;
+
+    // --- END GAME LOOP (Infinite) ---
+    while(1) {
+        // A. WIFI RECONNECT LOOP
+        if (WiFi.status() != WL_CONNECTED) {
+            ESP_LOGE("FIRE", "WiFi Lost. Reconnecting...");
+            WiFi.disconnect();
+            WiFi.begin(WIFI_SSID, WIFI_PASS);
+            
+            // Wait up to 5 seconds for WiFi, then loop around
+            int retries = 0;
+            while (WiFi.status() != WL_CONNECTED && retries < 10) {
+                delay(500);
+                Serial.print("!"); 
+                retries++;
+            }
+        }
+
+        // B. MQTT RECONNECT LOOP (Only if WiFi is good)
+        if (WiFi.status() == WL_CONNECTED && !fireMqttClient.connected()) {
+            ESP_LOGE("FIRE", "Connecting to MQTT Broker...");
+            if (fireMqttClient.connect(clientId.c_str(), MQTT_USER, MQTT_PASS)) {
+                ESP_LOGE("FIRE", "MQTT Connected!");
+            } else {
+                ESP_LOGE("FIRE", "MQTT Fail rc=%d. Wait 2s.", fireMqttClient.state());
+                delay(2000);
+            }
+        }
+
+        // C. THE BEACON (Continuous Publishing)
+        if (fireMqttClient.connected()) {
+            fireMqttClient.loop(); // Keep socket alive
+
+            long now = millis();
+            // Publish every 2 seconds
+            if (now - lastPub > 2000) {
+                lastPub = now;
+                
+                // Retained = true. 
+                // We keep sending it so "Last Seen" timestamp on dashboard stays fresh.
+                fireMqttClient.publish(TOPIC_PUB, "!!! FIRE DETECTED !!! SYSTEM HALTED.", true);
+                ESP_LOGE("FIRE", "SOS BROADCAST SENT.");
+                
+                // Visual Panic (Fast blink)
+                digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+            }
+        }
+        
+        delay(10); // Yield to prevent Watchdog Timer crash
+    }
 }
