@@ -68,7 +68,7 @@ void setup() {
     pinMode(MOIST_AOUT_PIN,INPUT_PULLUP);    
 
     i2c_setup();
-    init_camera_system();
+    camera_init();
 
     
     // 2. Create RTOS Objects

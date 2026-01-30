@@ -20,6 +20,9 @@
 35,36,37 (psram)
 4-13, 15-18 (camera)
 
+# camera
+ov5640
+
 # Wirings
 # 🥭 Smart Mango Garden - Hardware Pinout & Wiring
 

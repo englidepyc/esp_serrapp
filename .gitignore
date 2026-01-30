@@ -1,3 +1,4 @@
+examples/
 include/config.h
 .copilotignore
 .copilot-settings.md
