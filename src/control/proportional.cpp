@@ -26,7 +26,7 @@ void proportional_actuation(GardenMessage* msg) {
         msg->isActuated = true;
         is_heating = true; // Mark this so we know we just dried the air further
     } 
-    else if (msg->temp > (TARGET_TEMP_DAY + 2.0)) {
+    else if (msg->temp > (TARGET_TEMP_DAY + HYSTERESIS_TMP)) {
         // Venting logic (Bang-Bang)
         ESP_LOGW(TASKS_CPP_MANGO_TAG, "Temp High. Venting.");
         setDevice(FAN_EXT_P1, RELAY_ON);

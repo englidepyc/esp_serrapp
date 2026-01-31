@@ -16,11 +16,12 @@ extern EventGroupHandle_t syncBits;
 void taskComms(void *pvParameters) {
     GardenMessage rcv;
 
+    // TODO: WiFi setup
+
+    // TODO: MQTT setup
+
     // Wait for data from Task Mango
     if (xQueueReceive(dataQueue, &rcv, pdMS_TO_TICKS(10000)) == pdPASS) {
-        // TODO: WiFi setup
-        
-        // TODO: MQTT setup
         
         // TODO: Publish data to MQTT
         
