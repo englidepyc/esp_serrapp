@@ -22,10 +22,36 @@ void i2c_setup(bool enable_sensors) {
 }
 
 //returns a single measured relative humidity and temperature out of an aht sensor
-void i2c_temp_hum_vpd_scan(float &hum, float &temp, float &vpd, uint8_t sensor_bus){ 
+void temp_hum_single_sensor(float &hum, float &temp, uint8_t sensor_bus){
   temp = (float)random(5, 41);              // 5 to 40 °C
   hum = (float)random(0, 101);              // 0 to 100 %
-  vpd = (float)random(10, 35) / 10.0;       // 1.0 to 3.5 kPa (typical VPD range for southern Italy summer)
+}
+
+void temp_hum_scan_vpd(float &hum, float &temp, float &vpd){
+  float sum_hum = 0.0;
+  float sum_temp = 0.0;
+  uint8_t valid_readings = 0;
+
+  // Simula lettura di tutti i sensori
+  for (uint8_t i = 0; i < I2C_SENSORS_QTY; i++) {
+    float sensor_hum, sensor_temp;
+    temp_hum_single_sensor(sensor_hum, sensor_temp, i);
+    
+    // Le letture mock sono sempre valide
+    sum_hum += sensor_hum;
+    sum_temp += sensor_temp;
+    valid_readings++;
+    
+    // Delay per mantenere la stessa API/timing della versione reale
+    if (i < I2C_SENSORS_QTY - 1) {
+      vTaskDelay(pdMS_TO_TICKS(I2C_SENSOR_READ_DELAY_MS));
+    }
+  }
+
+  // Calcola la media
+  hum = sum_hum / valid_readings;
+  temp = sum_temp / valid_readings;
+  vpd = calculate_vpd(temp, hum);
 }
 
 float calculate_vpd(float temp, float hum){

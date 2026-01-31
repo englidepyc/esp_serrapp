@@ -46,14 +46,50 @@ void i2c_setup(bool enable_sensors = false) {
   
 }
 
-//returns a single measured relative humidity and temperature out of an aht sensor
-void i2c_temp_hum_vpd_scan(float &hum, float &temp, float &vpd, uint8_t sensor_bus){
+//get a single measured relative humidity and temperature out of an aht sensor
+void temp_hum_single_sensor(float &hum, float &temp, uint8_t sensor_bus){
   i2c_mux_select_bus(sensor_bus);
   _aht.getEvent(&_humidity,&_temp);
   
   hum = _humidity.relative_humidity;
   temp = _temp.temperature;
-  vpd = calculate_vpd(temp, hum);
+}
+
+void temp_hum_scan_vpd(float &hum, float &temp, float &vpd){
+  float sum_hum = 0.0;
+  float sum_temp = 0.0;
+  uint8_t valid_readings = 0;
+
+  // Leggi tutti i sensori
+  for (uint8_t i = 0; i < I2C_SENSORS_QTY; i++) {
+    float sensor_hum, sensor_temp;
+    temp_hum_single_sensor(sensor_hum, sensor_temp, i);
+    
+    // Verifica che le letture siano valide
+    if (!isnan(sensor_hum) && !isnan(sensor_temp)) {
+      sum_hum += sensor_hum;
+      sum_temp += sensor_temp;
+      valid_readings++;
+    }
+    
+    // Delay per evitare self-heating e stabilizzare il canale I2C
+    if (i < I2C_SENSORS_QTY - 1) {
+      vTaskDelay(pdMS_TO_TICKS(I2C_SENSOR_READ_DELAY_MS));
+    }
+  }
+
+  // Calcola la media
+  if (valid_readings > 0) {
+    hum = sum_hum / valid_readings;
+    temp = sum_temp / valid_readings;
+    vpd = calculate_vpd(temp, hum);
+  } else {
+    // Nessuna lettura valida
+    hum = NAN;
+    temp = NAN;
+    vpd = NAN;
+    ESP_LOGW(I2C_TEMP_HUM_READS_H_TAG, "Nessuna lettura valida dai sensori");
+  }
 }
 
 float calculate_vpd(float temp, float hum){

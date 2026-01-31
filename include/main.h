@@ -9,3 +9,7 @@ void execute_fire_protocol();
 void taskMango(void *pvParameters);
 void taskComms(void *pvParameters);
 void taskPWM(void* pvParameters);
+
+extern TaskHandle_t handleMango;
+extern TaskHandle_t handleComms;
+extern TaskHandle_t handlePWM;

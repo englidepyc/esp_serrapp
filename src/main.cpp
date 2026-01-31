@@ -14,9 +14,13 @@ constexpr static const char* MAIN_CPP_TAG = "MAIN.CPP/SETUP";
 #include "camera.h"
 #include "deep_sleep.h"
 
-// Globals for Task Coordination
+// Globals per rtos accessibili a tutti
 QueueHandle_t dataQueue;
 EventGroupHandle_t syncBits;
+
+TaskHandle_t handleMango = NULL;
+TaskHandle_t handleComms = NULL;
+TaskHandle_t handlePWM = NULL;
 
 //ISR, flag per fuoco
 volatile RTC_NOINIT_ATTR bool fire_reboot_triggered;
@@ -76,7 +80,7 @@ void setup() {
     syncBits = xEventGroupCreate();
 
     // 3. Launch Workers
-    xTaskCreatePinnedToCore(taskMango,  "Mango",  8192, NULL, 1, NULL, 1);
+    //xTaskCreatePinnedToCore(taskMango,  "Mango",  8192, NULL, 1, NULL, 1);
     xTaskCreatePinnedToCore(taskComms, "Comms", 8192, NULL, 1, NULL, 0);
     
     xTaskCreatePinnedToCore(taskPWM, "PWM_Heater", 1024, (void*)(intptr_t)HEATER_PWM_PIN, 1, NULL, 1);
