@@ -14,7 +14,7 @@ uint8_t i2c_mux_select_bus(uint8_t bus){
 }
 
 //inzializza tutti i sensori sul mux, da chiamare al setup
-void i2c_setup() {
+void i2c_setup(bool enable_sensors) {
   for (uint8_t i = 0; i < I2C_SENSORS_QTY; i++) {
     i2c_mux_select_bus(i); // Apri il canale i
       ESP_LOGD(M_I2C_TEMP_HUM_READS_H_TAG,"Mock i2c mux ok, mock sensore setup %d inizializzato.\n", i);  

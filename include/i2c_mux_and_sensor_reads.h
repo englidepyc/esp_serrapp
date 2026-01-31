@@ -14,6 +14,6 @@
 }; */
 
 uint8_t i2c_mux_select_bus(uint8_t bus);
-void i2c_setup();
+void i2c_setup(bool enable_sensors);
 void i2c_temp_hum_vpd_scan(float &hum, float &temp, float &vpd, uint8_t sensor_bus);
 float calculate_vpd(float temp, float hum);

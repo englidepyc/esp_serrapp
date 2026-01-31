@@ -28,3 +28,7 @@ void initIOExpander() {
     // Mock: non fa nulla
     ESP_LOGI(IO_EXP_TAG, "IO Expander inizializzato (MOCK - nessuna operazione reale)");
 }
+
+void resetIOExpander(){
+    ESP_LOGI(IO_EXP_TAG, "IO Expander resettato (MOCK - nessuna operazione reale)");
+}

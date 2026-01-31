@@ -21,7 +21,7 @@ uint8_t i2c_mux_select_bus(uint8_t bus){
 }
 
 //inzializza la comunicazione i2c e tutti i sensori sul mux, da chiamare al setup
-void i2c_setup() {
+void i2c_setup(bool enable_sensors = false) {
   Wire.begin(SDA_PIN,SCL_PIN);
 
   //controlla che il mux i2c è ok
@@ -31,7 +31,8 @@ void i2c_setup() {
     ESP_LOGD(I2C_TEMP_HUM_READS_H_TAG, "Mux i2c OK");
   }
 
-  for (uint8_t i = 0; i < I2C_SENSORS_QTY; i++) {
+  if(enable_sensors){
+    for (uint8_t i = 0; i < I2C_SENSORS_QTY; i++) {
     i2c_mux_select_bus(i); // Apri il canale i
     if (!_aht.begin()) {
       ESP_LOGW(I2C_TEMP_HUM_READS_H_TAG, "Sensore sul bus %d non trovato!", i);
@@ -41,6 +42,8 @@ void i2c_setup() {
   }
 
   ESP_LOGI(I2C_TEMP_HUM_READS_H_TAG,"Inizializzazione sensori i2c completata!");
+  }
+  
 }
 
 //returns a single measured relative humidity and temperature out of an aht sensor

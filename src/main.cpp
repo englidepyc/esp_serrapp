@@ -67,7 +67,7 @@ void setup() {
     pinMode(FLOAT_SWITCH_PIN,INPUT_PULLUP);
     pinMode(MOIST_AOUT_PIN,INPUT_PULLUP);    
 
-    i2c_setup();
+    i2c_setup(true);
     camera_init();
 
     
@@ -80,7 +80,7 @@ void setup() {
     xTaskCreatePinnedToCore(taskComms, "Comms", 8192, NULL, 1, NULL, 0);
     
     xTaskCreatePinnedToCore(taskPWM, "PWM_Heater", 1024, (void*)(intptr_t)HEATER_PWM_PIN, 1, NULL, 1);
-    xTaskCreatePinnedToCore(taskPWM, "PWM_Humif", 1024, (void*)(intptr_t)HUMIF_PWM_PIN, 1, NULL, 1);
+    //DOPO: xTaskCreatePinnedToCore(taskPWM, "PWM_Humif", 1024, (void*)(intptr_t)HUMIF_PWM_PIN, 1, NULL, 1);
 
     ESP_LOGI(MAIN_CPP_TAG,"Task creation called!");
 
@@ -122,7 +122,13 @@ void execute_fire_protocol() {
     ESP_LOGE("FIRE", "!!! FIRE PROTOCOL INITIATED !!!");
 
     // Safety: Kill relays immediately
-    // write_shift_register(0x00); 
+    digitalWrite(HEATER_PWM_PIN,RELAY_OFF);
+    digitalWrite(HUMIF_PWM_PIN,RELAY_OFF);
+    digitalWrite(FAN_HEATER_PIN,RELAY_OFF);
+    i2c_setup(false); //non abbiamo bisogno dei sensori!
+    resetIOExpander();
+
+    ESP_LOGE("FIRE", "IO EXPANDER AND GPIO RELAYS DEACTIVATED!");
 
     WiFi.mode(WIFI_STA);
     fireEspClient.setInsecure(); // Skip certs for speed
