@@ -5,6 +5,9 @@ extern const char* TASKS_CPP_MANGO_TAG = "TASK_MANGO.CPP";
 #include "common_hw.h"
 #include "control/proportional.h"
 #include "taskComms.h"
+#include "taskMango.h"
+
+RTC_DATA_ATTR float currentWaterCalcLevel = 100.0f;
 
 // --- TASK A: GARDEN LOGIC (Core 1) ---
 void taskMango(void *pvParameters) {   
@@ -108,4 +111,10 @@ void taskMango(void *pvParameters) {
     
     
     vTaskDelete(NULL);
+}
+
+//updates the currentWaterCalcLevel to the GardenMsg
+void updateCalcWaterLevel(float& waterLevel_percentage, int duration){
+    currentWaterCalcLevel = currentWaterCalcLevel - (K_WATER * duration);
+    waterLevel_percentage = currentWaterCalcLevel;
 }

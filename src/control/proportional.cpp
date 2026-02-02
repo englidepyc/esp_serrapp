@@ -3,6 +3,7 @@ extern const char* TASKS_CPP_MANGO_TAG;
 #include "pins.h"
 #include "common_hw.h"
 #include "control/proportional.h"
+#include "taskMango.h"
 
 void proportional_actuation(GardenMessage* msg) {
     bool is_heating = false;
@@ -80,6 +81,7 @@ void proportional_actuation(GardenMessage* msg) {
         vTaskDelay(pdMS_TO_TICKS(PUMP_DURATION_MS));
         setDevice(PUMP_P0, RELAY_OFF);
         msg->isActuated = true;
+        updateCalcWaterLevel(msg->waterCalcLevel, PUMP_DURATION_MS);
     }else if(msg->isWaterOver){
         ESP_LOGE(TASKS_CPP_MANGO_TAG, "Water tank depleted! Impossible to water plants!");
     }
