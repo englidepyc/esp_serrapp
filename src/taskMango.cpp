@@ -17,7 +17,7 @@ void taskMango(void *pvParameters) {
     //TODO: IMPLEMENTARE LOGICA ACQUA FINITA e CALCOLO LIVELLO DELL'ACQUA
     msg.isWaterOver = !(digitalRead(FLOAT_SWITCH_PIN)); //logica negata    
     // TODO: Implement sensor reading logic
-    i2c_temp_hum_vpd_scan(msg.hum, msg.temp, msg.vpd, 0);
+    temp_hum_scan_vpd(msg.hum, msg.temp, msg.vpd);
     msg.moisture = readMoisture_scan();
     msg.waterCalcLevel = 50; //%
 

@@ -70,12 +70,27 @@ Gli stati `RELAY_ON` e `RELAY_OFF` sono definiti in `pins.h` dato che vanno usat
 
 - in `src/main.cpp` E' NECSSARIO chiamare anche i vari metodi di setup delle restanti interfacce hardware, che inizializzano e testano le comunicazioni e impostano correttamente i pin. Questi sono `i2c_setup()` e `init_camera_system()`. Senza l'i2c setup non potremo leggere i sensori nè lavorare con l'io expander
 
-## Deep sleep
+## Ciclo di funzionamento
 
+### Task main
+La task principale, nel setup di `src/main.cpp`.
+- Inizializza e configura l'hardware e l'interfaccia hardware, spawna la task comms e finisce con il deep sleep.
+- Gestisce l'emergenza del fuoco tramite una flag persistente, rilevato sia durante il deep sleep sia durante la 'veglia' tramite isr, rebootando l'esp. in ciascun caso non crea nessun altra task.
+- Vengono esposti a tutti per sicurezza, tramite l'header, variabili importanti quali quelle di rtos, anche se vengono usate/ inizializzate dalle altre task 
+
+### Task comms
+- La task si connette al broker Mqtt sopra WiFi e sovrascrive il CmdMessage di default salvato in RTC e definito e inizializzato in `src/main.cpp`. Questo permette al tutto di continuare a funzionare anche in caso di mancata connessione, poi la task decide come proseguire, creando la taskMango con gli opportuni parametri della richiesta foto e della modalità _eco_ con cicli di deep sleep oppure _precision_ costantemente attiva
+- Si occupa di inviare tramite mqtt tutti i dettagli delle misurazioni e del lavoro di taskMango
+- DA IMPLEMENTARE la task si occupa anche di mandare la foto scattata da taskMango mentre taskMango continua a lavorare alla serra
+
+### Task mango
+DA IMPLEMENTARE
+
+### Deep sleep
 La funzione `deep_sleep_setup()` viene chiamata prima di avviare lo sleep nel setup di `src/main.cpp` per impostare correttamente il tempo di sleep
 
 ## Controllo della serra
 
 ### Controllo proporzionale TPC (con deep sleep)
 
-Nell'header `include/control/proportional.h` è possibile settare i vari parametri per il controllo tpc, che viene implementato nell'apposita sorgente e utilizzato da `src/taskMango.cpp`. Il ciclo a grandi linee è main -> taskMango -> taskComms con i dati -> main e deep sleep.
+Nell'header `include/control/proportional.h` è possibile settare i vari parametri per il controllo tpc, che viene implementato nell'apposita sorgente e utilizzato da `src/taskMango.cpp`, tramite l'apposita proportional.cpp

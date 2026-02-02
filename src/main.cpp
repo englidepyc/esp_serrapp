@@ -22,6 +22,9 @@ TaskHandle_t handleMango = NULL;
 TaskHandle_t handleComms = NULL;
 TaskHandle_t handlePWM = NULL;
 
+// Ultimo comando ricevuto, persistente tra deep sleep
+RTC_NOINIT_ATTR CmdMessage g_rtcCmdMessage;
+
 //ISR, flag per fuoco
 volatile RTC_NOINIT_ATTR bool fire_reboot_triggered;
 void IRAM_ATTR fire_isr() {
@@ -51,6 +54,10 @@ void setup() {
     // Inizializzazioni variabili RTC al primo avvio
     if (esp_reset_reason() == ESP_RST_POWERON) {
         fire_reboot_triggered = false;
+        // Default command: nessuna foto, eco ON, stop OFF
+        g_rtcCmdMessage.CmdPhotoReq = false;
+        g_rtcCmdMessage.CmdModeEco  = true;
+        g_rtcCmdMessage.CmdStop     = false;
         ESP_LOGI(MAIN_CPP_TAG, "Cold Boot. System Clean.");
     }
     
@@ -80,11 +87,8 @@ void setup() {
     syncBits = xEventGroupCreate();
 
     // 3. Launch Workers
-    //xTaskCreatePinnedToCore(taskMango,  "Mango",  8192, NULL, 1, NULL, 1);
     xTaskCreatePinnedToCore(taskComms, "Comms", 8192, NULL, 1, NULL, 0);
     
-    xTaskCreatePinnedToCore(taskPWM, "PWM_Heater", 1024, (void*)(intptr_t)HEATER_PWM_PIN, 1, NULL, 1);
-    //DOPO: xTaskCreatePinnedToCore(taskPWM, "PWM_Humif", 1024, (void*)(intptr_t)HUMIF_PWM_PIN, 1, NULL, 1);
 
     ESP_LOGI(MAIN_CPP_TAG,"Task creation called!");
 
@@ -153,7 +157,7 @@ void execute_fire_protocol() {
             int retries = 0;
             while (WiFi.status() != WL_CONNECTED && retries < 10) {
                 delay(500);
-                Serial.print("!"); 
+                ESP_LOGE("Fire!","!"); 
                 retries++;
             }
         }
