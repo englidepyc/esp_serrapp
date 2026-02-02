@@ -14,9 +14,16 @@ constexpr static const char* MAIN_CPP_TAG = "MAIN.CPP/SETUP";
 #include "camera.h"
 #include "deep_sleep.h"
 
-// Globals for Task Coordination
+// Globals per rtos accessibili a tutti
 QueueHandle_t dataQueue;
 EventGroupHandle_t syncBits;
+
+TaskHandle_t handleMango = NULL;
+TaskHandle_t handleComms = NULL;
+TaskHandle_t handlePWM = NULL;
+
+// Ultimo comando ricevuto, persistente tra deep sleep
+RTC_NOINIT_ATTR CmdMessage g_rtcCmdMessage;
 
 //ISR, flag per fuoco
 volatile RTC_NOINIT_ATTR bool fire_reboot_triggered;
@@ -47,6 +54,10 @@ void setup() {
     // Inizializzazioni variabili RTC al primo avvio
     if (esp_reset_reason() == ESP_RST_POWERON) {
         fire_reboot_triggered = false;
+        // Default command: nessuna foto, eco ON, stop OFF
+        g_rtcCmdMessage.CmdPhotoReq = false;
+        g_rtcCmdMessage.CmdModeEco  = true;
+        g_rtcCmdMessage.CmdStop     = false;
         ESP_LOGI(MAIN_CPP_TAG, "Cold Boot. System Clean.");
     }
     
@@ -67,7 +78,7 @@ void setup() {
     pinMode(FLOAT_SWITCH_PIN,INPUT_PULLUP);
     pinMode(MOIST_AOUT_PIN,INPUT_PULLUP);    
 
-    i2c_setup();
+    i2c_setup(true);
     camera_init();
 
     
@@ -76,11 +87,8 @@ void setup() {
     syncBits = xEventGroupCreate();
 
     // 3. Launch Workers
-    xTaskCreatePinnedToCore(taskMango,  "Mango",  8192, NULL, 1, NULL, 1);
     xTaskCreatePinnedToCore(taskComms, "Comms", 8192, NULL, 1, NULL, 0);
     
-    xTaskCreatePinnedToCore(taskPWM, "PWM_Heater", 1024, (void*)(intptr_t)HEATER_PWM_PIN, 1, NULL, 1);
-    xTaskCreatePinnedToCore(taskPWM, "PWM_Humif", 1024, (void*)(intptr_t)HUMIF_PWM_PIN, 1, NULL, 1);
 
     ESP_LOGI(MAIN_CPP_TAG,"Task creation called!");
 
@@ -122,7 +130,13 @@ void execute_fire_protocol() {
     ESP_LOGE("FIRE", "!!! FIRE PROTOCOL INITIATED !!!");
 
     // Safety: Kill relays immediately
-    // write_shift_register(0x00); 
+    digitalWrite(HEATER_PWM_PIN,RELAY_OFF);
+    digitalWrite(HUMIF_PWM_PIN,RELAY_OFF);
+    digitalWrite(FAN_HEATER_PIN,RELAY_OFF);
+    i2c_setup(false); //non abbiamo bisogno dei sensori!
+    resetIOExpander();
+
+    ESP_LOGE("FIRE", "IO EXPANDER AND GPIO RELAYS DEACTIVATED!");
 
     WiFi.mode(WIFI_STA);
     fireEspClient.setInsecure(); // Skip certs for speed
@@ -143,7 +157,7 @@ void execute_fire_protocol() {
             int retries = 0;
             while (WiFi.status() != WL_CONNECTED && retries < 10) {
                 delay(500);
-                Serial.print("!"); 
+                ESP_LOGE("Fire!","!"); 
                 retries++;
             }
         }

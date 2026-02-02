@@ -23,3 +23,4 @@ void updateIOExpander(); // Funzione interna, ma accessibile se serve forzare l'
 void setAllOutputs(bool state);
 void setDevice(Device dev, bool state);
 void setAmuxChannel(byte channel);
+void resetIOExpander();
