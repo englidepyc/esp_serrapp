@@ -38,8 +38,7 @@ void taskComms(void *pvParameters) {
     GardenMessage rcv{};
 
 
-    bool can_sleep = false;
-    while (!can_sleep) {
+
         if (!ensureWifiConnected()) {
             ESP_LOGE(TASKS_CPP_COMMS_TAG,
                      "Abort: WiFi non disponibile. Proseguo a default");
@@ -106,15 +105,39 @@ void taskComms(void *pvParameters) {
             }
         } else if (effectiveCmd.CmdModeEco == true){
             ESP_LOGI(TASKS_CPP_COMMS_TAG,
-                     "Modalità eco attivata, posso fare operazioni e dopo vado in sleep. TODO IMPLEMENTARE...");
-            if (effectiveCmd.CmdPhotoReq) {
-                ESP_LOGI(TASKS_CPP_COMMS_TAG, "Foto Richiesta!");
-            }
-            can_sleep = true;        
-        }
-    }
+                     "Modalità eco attivata, avvio taskMango e poi posso andare in sleep.");
 
-    // 5. Segnala al setup() che le comunicazioni sono finite (anche se senza comandi)
+            MangoTaskConfig *mangoCfg = new MangoTaskConfig;
+            mangoCfg->doPhoto = effectiveCmd.CmdPhotoReq;
+            mangoCfg->isEcoMode = true;
+
+            BaseType_t created = xTaskCreatePinnedToCore(
+                taskMango,
+                "Mango",
+                8192,
+                mangoCfg,
+                1,
+                &handleMango,
+                1
+            );
+
+            if (created != pdPASS) {
+                ESP_LOGE(TASKS_CPP_COMMS_TAG,
+                         "Errore nella creazione di taskMango (Eco mode)");
+                delete mangoCfg;
+            } else if (effectiveCmd.CmdPhotoReq) {
+                ESP_LOGI(TASKS_CPP_COMMS_TAG, "Foto richiesta: flag passato a taskMango");
+            }       
+        }
+
+    // 5. Aspetta mango e segnala al setup() che le comunicazioni sono finite (anche se senza comandi)
+    EventBits_t bits = xEventGroupWaitBits(
+        syncBits, 
+        BIT_MANGO_DONE, // Watch for these bits
+        pdFALSE,                   // Clear bits on exit? (False: we want to read them)
+        pdFALSE,                   // WaitForAllBits? FALSE = "OR" Logic (Wake on ANY)
+        portMAX_DELAY              // Block forever until one happens
+    );
     xEventGroupSetBits(syncBits, BIT_COMMS_DONE);
     vTaskDelete(nullptr);
 }
@@ -274,7 +297,7 @@ static bool ensureMqttConnected(WiFiClientSecure &espClient, PubSubClient &mqttC
                  "Tentativo connessione MQTT #%d",
                  attempt);
 
-        String clientId = String("ESP32-SERRAPP-") + String(random(0xffff), HEX);
+        String clientId = String("ESP32-SERRAPP");
 
         if (mqttClient.connect(clientId.c_str(), MQTT_USER, MQTT_PASS)) {
             ESP_LOGI(TASKS_CPP_COMMS_TAG, "MQTT connesso.");

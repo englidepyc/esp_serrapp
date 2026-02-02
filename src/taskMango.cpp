@@ -9,10 +9,35 @@ extern QueueHandle_t dataQueue;
 
 // --- TASK A: GARDEN LOGIC (Core 1) ---
 void taskMango(void *pvParameters) {
+    
+    MangoTaskConfig config{};
+    if (pvParameters != nullptr) {
+        MangoTaskConfig* incoming = static_cast<MangoTaskConfig*>(pvParameters);
+        config = *incoming;
+        delete incoming;
+    } else {
+        config.doPhoto = false;
+        config.isEcoMode = true;
+    }
+
     GardenMessage msg{};
     msg.errCode = 0;
-    msg.isActuated = false;
-    msg.nextMessageTime = 60;
+
+
+    
+    if (config.isEcoMode) {
+        //MODALITA' ECO TPC
+        msg.isActuated = false;
+        msg.nextMessageTime = 60;
+
+    } else {
+        ESP_LOGD(TASKS_CPP_MANGO_TAG, "Modalita' PRECISION attivata in taskMango");
+    }
+
+    if (config.doPhoto) {
+        ESP_LOGD(TASKS_CPP_MANGO_TAG, "Foto richiesta (TODO: implementare camera qui)");
+    }
+
     
     //TODO: IMPLEMENTARE LOGICA ACQUA FINITA e CALCOLO LIVELLO DELL'ACQUA
     msg.isWaterOver = !(digitalRead(FLOAT_SWITCH_PIN)); //logica negata    

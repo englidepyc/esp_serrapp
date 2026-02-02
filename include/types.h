@@ -24,3 +24,8 @@ struct CmdMessage {
     bool CmdModeEco;
     bool CmdStop;
 };
+
+struct MangoTaskConfig {
+    bool doPhoto;   // se fare la foto
+    bool isEcoMode; // true = eco, false = precision
+};

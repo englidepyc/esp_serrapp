@@ -142,7 +142,7 @@ void execute_fire_protocol() {
     fireEspClient.setInsecure(); // Skip certs for speed
     fireMqttClient.setServer(MQTT_BROKER, MQTT_PORT);
 
-    String clientId = "ESP32-FIRE-" + String(random(0xffff), HEX);
+    String clientId = "ESP32-SERRAPP-FIRE";
     long lastPub = 0;
 
     // --- END GAME LOOP (Infinite) ---
