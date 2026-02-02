@@ -7,9 +7,11 @@ constexpr static const char* TASKS_CPP_COMMS_TAG = "TASK_COMMS.CPP";
 #include "config.h"
 #include "types.h"
 #include "main.h"
+#include "taskComms.h"
 
-extern QueueHandle_t dataQueue;
 extern EventGroupHandle_t syncBits;
+QueueHandle_t dataQueue = nullptr;
+QueueHandle_t frameQueue = nullptr;
 
 // --- MQTT command context (owned by taskComms) ---
 struct MqttCmdContext {
@@ -35,9 +37,13 @@ void taskComms(void *pvParameters) {
     cmdContext.hasLatestCmd = false;
     g_cmdContext = &cmdContext;
 
-    GardenMessage rcv{};
-
-
+    // Crea le code al primo avvio (se non ancora create)
+    if (dataQueue == nullptr) {
+        dataQueue = xQueueCreate(2, sizeof(GardenMessage));
+    }
+    if (frameQueue == nullptr) {
+        frameQueue = xQueueCreate(2, sizeof(CameraFrame));
+    }
 
         if (!ensureWifiConnected()) {
             ESP_LOGE(TASKS_CPP_COMMS_TAG,
@@ -89,8 +95,10 @@ void taskComms(void *pvParameters) {
                      static_cast<int>(effectiveCmd.CmdStop));
         }
 
-        // 4c. Gestione del comando effettivo
+        //**** Gestione del comando effettivo
+        
         if (effectiveCmd.CmdStop) {
+          //*** STOP DETECTED */
             while (1) {
                 ESP_LOGI(TASKS_CPP_COMMS_TAG,
                          "Comando di stop ricevuto, serra sospesa in loop...");
@@ -98,14 +106,15 @@ void taskComms(void *pvParameters) {
             }
         } else if (effectiveCmd.CmdModeEco == false) {
             while (1) {
-                //TODO: Implementare modalità precision...
+                //TODO: *** PRECISION
                 ESP_LOGI(TASKS_CPP_COMMS_TAG,
                          "Modalità precision attivata vado in loop, TODO IMPLEMENTARE...");
                 vTaskDelay(pdMS_TO_TICKS(1000));
             }
         } else if (effectiveCmd.CmdModeEco == true){
+            //*****MODE ECO ******/
             ESP_LOGI(TASKS_CPP_COMMS_TAG,
-                     "Modalità eco attivata, avvio taskMango e poi posso andare in sleep.");
+                     "Modalità eco attivata, avvio taskMango.");
 
             MangoTaskConfig *mangoCfg = new MangoTaskConfig;
             mangoCfg->doPhoto = effectiveCmd.CmdPhotoReq;
@@ -125,19 +134,46 @@ void taskComms(void *pvParameters) {
                 ESP_LOGE(TASKS_CPP_COMMS_TAG,
                          "Errore nella creazione di taskMango (Eco mode)");
                 delete mangoCfg;
-            } else if (effectiveCmd.CmdPhotoReq) {
-                ESP_LOGI(TASKS_CPP_COMMS_TAG, "Foto richiesta: flag passato a taskMango");
-            }       
-        }
+            
+            }else{
+                
+                // Due cicli prima e dopo (GardenMessage + eventuale CameraFrame)
+                for (int i = 0; i < 2; ++i) {
+                        GardenMessage dataMsg{};
+                        if (xQueueReceive(dataQueue, &dataMsg, pdMS_TO_TICKS(5000)) != pdTRUE) {
+                            ESP_LOGE(TASKS_CPP_COMMS_TAG,
+                                    "Timeout in attesa del GardenMessage %d da Mango", i);
+                            break;
+                        }
+                        
+                        if(effectiveCmd.CmdPhotoReq){
+                            CameraFrame  frame{};
+                            if (xQueueReceive(frameQueue, &frame, pdMS_TO_TICKS(5000)) != pdTRUE) {
+                            ESP_LOGE(TASKS_CPP_COMMS_TAG,
+                                    "Timeout in attesa del frame %d da Mango", i);
+                            break;
+                            }
+                        }
+                        
+                        //TODO: Costruire mqtt in base a isActuated
+                        if (!dataMsg.isActuated) {
+                            ESP_LOGI(TASKS_CPP_COMMS_TAG,
+                                    "Ricevuta foto da mango PRIMA irrigazione (TODO: upload Firebase)");
+                        } else {
+                            ESP_LOGI(TASKS_CPP_COMMS_TAG,
+                                    "Ricevuta foto da mango DOPO irrigazione (TODO: upload Firebase)");
+                        }
 
-    // 5. Aspetta mango e segnala al setup() che le comunicazioni sono finite (anche se senza comandi)
-    EventBits_t bits = xEventGroupWaitBits(
-        syncBits, 
-        BIT_MANGO_DONE, // Watch for these bits
-        pdFALSE,                   // Clear bits on exit? (False: we want to read them)
-        pdFALSE,                   // WaitForAllBits? FALSE = "OR" Logic (Wake on ANY)
-        portMAX_DELAY              // Block forever until one happens
-    );
+                        // TODO: Inviare MQTT ed (eventuale) foto
+                }
+
+                
+            }/*CREAZIONE MANGO TASK SUCCESSFUL */
+        
+        
+        }//*****MODE ECO ****/
+
+    // 5. Segnala al setup() che le comunicazioni sono finite (anche se senza comandi)
     xEventGroupSetBits(syncBits, BIT_COMMS_DONE);
     vTaskDelete(nullptr);
 }

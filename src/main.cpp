@@ -15,7 +15,6 @@ constexpr static const char* MAIN_CPP_TAG = "MAIN.CPP/SETUP";
 #include "deep_sleep.h"
 
 // Globals per rtos accessibili a tutti
-QueueHandle_t dataQueue;
 EventGroupHandle_t syncBits;
 
 TaskHandle_t handleMango = NULL;
@@ -83,7 +82,6 @@ void setup() {
 
     
     // 2. Create RTOS Objects
-    dataQueue = xQueueCreate(5, sizeof(GardenMessage));
     syncBits = xEventGroupCreate();
 
     // 3. Launch Workers

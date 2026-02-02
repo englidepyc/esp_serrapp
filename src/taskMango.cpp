@@ -4,12 +4,10 @@ extern const char* TASKS_CPP_MANGO_TAG = "TASK_MANGO.CPP";
 #include "config.h"
 #include "common_hw.h"
 #include "control/proportional.h"
-
-extern QueueHandle_t dataQueue;
+#include "taskComms.h"
 
 // --- TASK A: GARDEN LOGIC (Core 1) ---
-void taskMango(void *pvParameters) {
-    
+void taskMango(void *pvParameters) {   
     MangoTaskConfig config{};
     if (pvParameters != nullptr) {
         MangoTaskConfig* incoming = static_cast<MangoTaskConfig*>(pvParameters);
@@ -26,35 +24,88 @@ void taskMango(void *pvParameters) {
 
     
     if (config.isEcoMode) {
-        //MODALITA' ECO TPC
-        msg.isActuated = false;
+    //******* MODALITA' ECO TPC ********
         msg.nextMessageTime = 60;
 
+
+        //**PRIMA**
+        msg.isActuated = false;      
+        xQueueSend(dataQueue, &msg, pdMS_TO_TICKS(100));  
+        
+        if(config.doPhoto){
+            CameraFrame beforeFrame{};
+            xQueueSend(frameQueue, &beforeFrame, pdMS_TO_TICKS(100));
+        }
+
+ 
+
+            //***ATTUAZIONE***/
+            msg.isWaterOver = !(digitalRead(FLOAT_SWITCH_PIN)); //logica negata    
+            temp_hum_scan_vpd(msg.hum, msg.temp, msg.vpd);
+            msg.moisture = readMoisture_scan();
+            msg.waterCalcLevel = 50; //%
+
+            ESP_LOGI(TASKS_CPP_MANGO_TAG, "Scan Result -> T:%.1f H:%.1f VPD:%.2f Soil:%d%% (fixed) Tank:%.1f", 
+                msg.temp, msg.hum, msg.vpd, msg.moisture, msg.waterCalcLevel);
+            proportional_actuation(&msg);
+
+
+
+
+        //**DOPO**
+        msg.isActuated = true;
+        xQueueSend(dataQueue, &msg, pdMS_TO_TICKS(100));
+        
+        if(config.doPhoto){
+            CameraFrame afterFrame{};
+            xQueueSend(frameQueue, &afterFrame, pdMS_TO_TICKS(100));
+        }
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     } else {
         ESP_LOGD(TASKS_CPP_MANGO_TAG, "Modalita' PRECISION attivata in taskMango");
     }
 
-    if (config.doPhoto) {
-        ESP_LOGD(TASKS_CPP_MANGO_TAG, "Foto richiesta (TODO: implementare camera qui)");
-    }
-
-    
-    //TODO: IMPLEMENTARE LOGICA ACQUA FINITA e CALCOLO LIVELLO DELL'ACQUA
-    msg.isWaterOver = !(digitalRead(FLOAT_SWITCH_PIN)); //logica negata    
-    // TODO: Implement sensor reading logic
-    temp_hum_scan_vpd(msg.hum, msg.temp, msg.vpd);
-    msg.moisture = readMoisture_scan();
-    msg.waterCalcLevel = 50; //%
-
-    ESP_LOGI(TASKS_CPP_MANGO_TAG, "Scan Result -> T:%.1f H:%.1f VPD:%.2f Soil:%d%% (fixed) Tank:%.1f", 
-             msg.temp, msg.hum, msg.vpd, msg.moisture, msg.waterCalcLevel);
-
     
 
-    proportional_actuation(&msg);
-
     
-    // Send data to Comms task
-    xQueueSend(dataQueue, &msg, pdMS_TO_TICKS(100));
+    
     vTaskDelete(NULL);
 }
