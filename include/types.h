@@ -21,11 +21,6 @@ struct GardenMessage {
 
 struct CmdMessage {
     bool CmdPhotoReq;
-    bool CmdModeEco;
+    bool CmdModePrecision;
     bool CmdStop;
-};
-
-struct MangoTaskConfig {
-    bool doPhoto;   // se fare la foto
-    bool isEcoMode; // true = eco, false = precision
 };

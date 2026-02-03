@@ -1,4 +1,4 @@
-extern const char* TASKS_CPP_MANGO_TAG;
+constexpr static const char* TASKS_CPP_MANGO_TAG = "PROPORTIONAL.CPP";
 #include <Arduino.h>
 #include "pins.h"
 #include "common_hw.h"

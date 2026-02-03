@@ -21,8 +21,6 @@ TaskHandle_t handleMango = NULL;
 TaskHandle_t handleComms = NULL;
 TaskHandle_t handlePWM = NULL;
 
-// Ultimo comando ricevuto, persistente tra deep sleep
-RTC_NOINIT_ATTR CmdMessage g_rtcCmdMessage;
 
 //ISR, flag per fuoco
 volatile RTC_NOINIT_ATTR bool fire_reboot_triggered;
@@ -50,13 +48,9 @@ void setup() {
 
     pwmSetup(); //sempre impostiamo i pin del riscaldatore spenti (RELAY_OFF) per sicurezza come prima cosa e inizializziamo i pin
 
-    // Inizializzazioni variabili RTC al primo avvio
+    // Inizializzazioni variabile RTC fuoco al primo avvio
     if (esp_reset_reason() == ESP_RST_POWERON) {
         fire_reboot_triggered = false;
-        // Default command: nessuna foto, eco ON, stop OFF
-        g_rtcCmdMessage.CmdPhotoReq = false;
-        g_rtcCmdMessage.CmdModeEco  = true;
-        g_rtcCmdMessage.CmdStop     = false;
         ESP_LOGI(MAIN_CPP_TAG, "Cold Boot. System Clean.");
     }
     

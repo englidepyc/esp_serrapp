@@ -11,7 +11,7 @@ constexpr static const char* TASKS_CPP_COMMS_TAG = "TASK_COMMS.CPP";
 
 extern EventGroupHandle_t syncBits;
 QueueHandle_t dataQueue = nullptr;
-QueueHandle_t frameQueue = nullptr;
+RTC_DATA_ATTR CmdMessage g_rtcCmdMessage;
 
 // --- MQTT command context (owned by taskComms) ---
 struct MqttCmdContext {
@@ -40,9 +40,6 @@ void taskComms(void *pvParameters) {
     // Crea le code al primo avvio (se non ancora create)
     if (dataQueue == nullptr) {
         dataQueue = xQueueCreate(2, sizeof(GardenMessage));
-    }
-    if (frameQueue == nullptr) {
-        frameQueue = xQueueCreate(2, sizeof(CameraFrame));
     }
 
         if (!ensureWifiConnected()) {
@@ -83,15 +80,15 @@ void taskComms(void *pvParameters) {
             effectiveCmd    = cmdContext.latestCmd;
 
             ESP_LOGI(TASKS_CPP_COMMS_TAG,
-                     "Nuovo comando applicato e salvato in RTC -> PhotoReq=%d ModeEco=%d Stop=%d",
+                     "Nuovo comando applicato e salvato in RTC -> PhotoReq=%d ModePrecision=%d Stop=%d",
                      static_cast<int>(effectiveCmd.CmdPhotoReq),
-                     static_cast<int>(effectiveCmd.CmdModeEco),
+                     static_cast<int>(effectiveCmd.CmdModePrecision),
                      static_cast<int>(effectiveCmd.CmdStop));
         } else {
             ESP_LOGI(TASKS_CPP_COMMS_TAG,
-                     "Nessun nuovo comando MQTT: uso il comando in RTC -> PhotoReq=%d ModeEco=%d Stop=%d",
+                     "Nessun nuovo comando MQTT: uso il comando in RTC -> PhotoReq=%d ModePrecision=%d Stop=%d",
                      static_cast<int>(effectiveCmd.CmdPhotoReq),
-                     static_cast<int>(effectiveCmd.CmdModeEco),
+                     static_cast<int>(effectiveCmd.CmdModePrecision),
                      static_cast<int>(effectiveCmd.CmdStop));
         }
 
@@ -104,27 +101,23 @@ void taskComms(void *pvParameters) {
                          "Comando di stop ricevuto, serra sospesa in loop...");
                 vTaskDelay(pdMS_TO_TICKS(1000));
             }
-        } else if (effectiveCmd.CmdModeEco == false) {
+        } else if (effectiveCmd.CmdModePrecision == true) {
             while (1) {
                 //TODO: *** PRECISION
                 ESP_LOGI(TASKS_CPP_COMMS_TAG,
                          "Modalità precision attivata vado in loop, TODO IMPLEMENTARE...");
                 vTaskDelay(pdMS_TO_TICKS(1000));
             }
-        } else if (effectiveCmd.CmdModeEco == true){
+        } else if (effectiveCmd.CmdModePrecision == false){
             //*****MODE ECO ******/
             ESP_LOGI(TASKS_CPP_COMMS_TAG,
                      "Modalità eco attivata, avvio taskMango.");
-
-            MangoTaskConfig *mangoCfg = new MangoTaskConfig;
-            mangoCfg->doPhoto = effectiveCmd.CmdPhotoReq;
-            mangoCfg->isEcoMode = true;
 
             BaseType_t created = xTaskCreatePinnedToCore(
                 taskMango,
                 "Mango",
                 8192,
-                mangoCfg,
+                (void*)1, // usa pvParameters come semplice flag eco/non-eco
                 1,
                 &handleMango,
                 1
@@ -133,7 +126,6 @@ void taskComms(void *pvParameters) {
             if (created != pdPASS) {
                 ESP_LOGE(TASKS_CPP_COMMS_TAG,
                          "Errore nella creazione di taskMango (Eco mode)");
-                delete mangoCfg;
             
             }else{
                 
@@ -147,24 +139,17 @@ void taskComms(void *pvParameters) {
                         }
                         
                         if(effectiveCmd.CmdPhotoReq){
-                            CameraFrame  frame{};
-                            if (xQueueReceive(frameQueue, &frame, pdMS_TO_TICKS(60000)) != pdTRUE) {
-                            ESP_LOGE(TASKS_CPP_COMMS_TAG,
-                                    "Timeout in attesa del frame %d da Mango", i);
-                            break;
-                            }
+                            CameraFrame  frame{};    
                         }
                         
-                        //TODO: Costruire mqtt in base a isActuated
+                        //TODO: Costruire mqtt e inviare foto in base a isActuated
                         if (!dataMsg.isActuated) {
                             ESP_LOGI(TASKS_CPP_COMMS_TAG,
-                                    "Ricevuta foto da mango PRIMA irrigazione (TODO: upload Firebase)");
+                                    "dati e foto PRIMA irrigazione (TODO: upload Firebase)");
                         } else {
                             ESP_LOGI(TASKS_CPP_COMMS_TAG,
-                                    "Ricevuta foto da mango DOPO irrigazione (TODO: upload Firebase)");
+                                    "Dati e foto da mango DOPO irrigazione (TODO: upload Firebase)");
                         }
-
-                        // TODO: Inviare MQTT ed (eventuale) foto
                 }
 
                 
@@ -238,8 +223,8 @@ static bool parseCmdMessageJson(const String &json, CmdMessage &cmdOut) {
         tmp.CmdPhotoReq = value;
         anyField = true;
     }
-    if (parseBoolField(json, "CmdModeEco", value)) {
-        tmp.CmdModeEco = value;
+    if (parseBoolField(json, "CmdModePrecision", value)) {
+        tmp.CmdModePrecision = value;
         anyField = true;
     }
     if (parseBoolField(json, "CmdStop", value)) {
@@ -280,10 +265,10 @@ static void mqttCallback(char *topic, byte *payload, unsigned int length) {
         g_cmdContext->hasLatestCmd = true;
 
         ESP_LOGI(TASKS_CPP_COMMS_TAG,
-                 "CmdMessage aggiornato -> PhotoReq=%d ModeEco=%d Stop=%d",
-                 static_cast<int>(parsed.CmdPhotoReq),
-                 static_cast<int>(parsed.CmdModeEco),
-                 static_cast<int>(parsed.CmdStop));
+             "CmdMessage aggiornato -> PhotoReq=%d ModePrecision=%d Stop=%d",
+             static_cast<int>(parsed.CmdPhotoReq),
+             static_cast<int>(parsed.CmdModePrecision),
+             static_cast<int>(parsed.CmdStop));
     } else {
         ESP_LOGW(TASKS_CPP_COMMS_TAG,
                  "JSON ricevuto ma non valido per CmdMessage: %s",

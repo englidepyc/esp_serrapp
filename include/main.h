@@ -21,5 +21,3 @@ extern TaskHandle_t handleMango;
 extern TaskHandle_t handleComms;
 extern TaskHandle_t handlePWM;
 
-// Ultimo comando ricevuto (persistente su RTC tra deep sleep)
-extern CmdMessage g_rtcCmdMessage;

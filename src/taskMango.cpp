@@ -1,4 +1,4 @@
-extern const char* TASKS_CPP_MANGO_TAG = "TASK_MANGO.CPP";
+constexpr static const char* TASKS_CPP_MANGO_TAG = "TASK_MANGO.CPP";
 #include <Arduino.h>
 
 #include "config.h"
@@ -12,22 +12,15 @@ RTC_DATA_ATTR float currentWaterCalcLevel = 100.0f;
 
 // --- TASK A: GARDEN LOGIC (Core 1) ---
 void taskMango(void *pvParameters) {   
-    MangoTaskConfig config{};
-    if (pvParameters != nullptr) {
-        MangoTaskConfig* incoming = static_cast<MangoTaskConfig*>(pvParameters);
-        config = *incoming;
-        delete incoming;
-    } else {
-        config.doPhoto = false;
-        config.isEcoMode = true;
-    }
+    // pvParameters viene usato solo come flag: non serve heap
+    bool isEcoMode = (pvParameters != nullptr);
 
     GardenMessage msg{};
     msg.errCode = 0;
 
 
     
-    if (config.isEcoMode) {
+    if (isEcoMode) {
     //******* MODALITA' ECO TPC ********
         msg.nextMessageTime = 60;
 
@@ -41,12 +34,6 @@ void taskMango(void *pvParameters) {
         msg.moisture = readMoisture_scan();
 
         xQueueSend(dataQueue, &msg, pdMS_TO_TICKS(100));  
-        
-        if(config.doPhoto){
-            CameraFrame beforeFrame{};
-            xQueueSend(frameQueue, &beforeFrame, pdMS_TO_TICKS(100));
-        }
-
  
 
             //***ATTUAZIONE***/
@@ -69,11 +56,6 @@ void taskMango(void *pvParameters) {
         msg.moisture = readMoisture_scan();
 
         xQueueSend(dataQueue, &msg, pdMS_TO_TICKS(100));
-        
-        if(config.doPhoto){
-            CameraFrame afterFrame{};
-            xQueueSend(frameQueue, &afterFrame, pdMS_TO_TICKS(100));
-        }
 
     
     
