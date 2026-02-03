@@ -22,7 +22,6 @@ void taskMango(void *pvParameters) {
     
     if (isEcoMode) {
     //******* MODALITA' ECO TPC ********
-        msg.nextMessageTime = 60;
 
 
         //**PRIMA**

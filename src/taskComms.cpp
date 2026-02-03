@@ -3,6 +3,7 @@ constexpr static const char* TASKS_CPP_COMMS_TAG = "TASK_COMMS.CPP";
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
+#include <ArduinoJson.h>
 
 #include "config.h"
 #include "types.h"
@@ -21,8 +22,6 @@ struct MqttCmdContext {
 
 static MqttCmdContext* g_cmdContext = nullptr; // set by taskComms when running
 // --- Prototipi funzioni locali ---
-static bool parseBoolValue(const String &src, int valueStart, bool &out);
-static bool parseBoolField(const String &json, const char *key, bool &out);
 static bool parseCmdMessageJson(const String &json, CmdMessage &cmdOut);
 static String buildGardenMessageJson(const GardenMessage &dataMsg);
 
@@ -186,72 +185,31 @@ void taskComms(void *pvParameters) {
     vTaskDelete(nullptr);
 }
 
-// --- Implementazione funzioni ausiliarie ---
-
-static bool parseBoolValue(const String &src, int valueStart, bool &out) {
-    // Skip whitespace
-    while (valueStart < (int)src.length() &&
-           (src[valueStart] == ' ' || src[valueStart] == '\t' ||
-            src[valueStart] == '\n' || src[valueStart] == '\r')) {
-        ++valueStart;
-    }
-
-    if (valueStart >= (int)src.length()) {
-        return false;
-    }
-
-    if (src.startsWith("true", valueStart)) {
-        out = true;
-        return true;
-    }
-    if (src.startsWith("false", valueStart)) {
-        out = false;
-        return true;
-    }
-
-    // Also accept numeric 1/0 just in case
-    if (src[valueStart] == '1') {
-        out = true;
-        return true;
-    }
-    if (src[valueStart] == '0') {
-        out = false;
-        return true;
-    }
-
-    return false;
-}
-
-static bool parseBoolField(const String &json, const char *key, bool &out) {
-    String pattern = String("\"") + key + "\"";
-    int keyPos = json.indexOf(pattern);
-    if (keyPos < 0) {
-        return false; // field not present
-    }
-
-    int colonPos = json.indexOf(':', keyPos + pattern.length());
-    if (colonPos < 0) {
-        return false;
-    }
-
-    return parseBoolValue(json, colonPos + 1, out);
-}
-
 static bool parseCmdMessageJson(const String &json, CmdMessage &cmdOut) {
     CmdMessage tmp{};
     bool anyField = false;
 
-    bool value = false;
-    if (parseBoolField(json, "CmdPhotoReq", value)) {
-        tmp.CmdPhotoReq = value;
+    StaticJsonDocument<256> doc;
+    DeserializationError err = deserializeJson(doc, json);
+    if (err) {
+        ESP_LOGW(TASKS_CPP_COMMS_TAG,
+                 "deserializeJson fallita: %s",
+                 err.c_str());
+        return false;
+    }
+
+    JsonObject obj = doc.as<JsonObject>();
+
+    if (obj.containsKey("CmdPhotoReq")) {
+        tmp.CmdPhotoReq = obj["CmdPhotoReq"].as<bool>();
         anyField = true;
     }
-    if (parseBoolField(json, "CmdModePrecision", value)) {
-        tmp.CmdModePrecision = value;
+    if (obj.containsKey("CmdModePrecision")) {
+        tmp.CmdModePrecision = obj["CmdModePrecision"].as<bool>();
         anyField = true;
     }
-    if (parseBoolField(json, "CmdStop", value)) {
-        tmp.CmdStop = value;
+    if (obj.containsKey("CmdStop")) {
+        tmp.CmdStop = obj["CmdStop"].as<bool>();
         anyField = true;
     }
 
@@ -265,20 +223,22 @@ static bool parseCmdMessageJson(const String &json, CmdMessage &cmdOut) {
 
 // Costruisce il JSON MQTT a partire da un GardenMessage
 static String buildGardenMessageJson(const GardenMessage &dataMsg) {
+    StaticJsonDocument<256> doc;
+    JsonObject obj = doc.to<JsonObject>();
+
+    obj["temp"] = dataMsg.temp;
+    obj["hum"] = dataMsg.hum;
+    obj["vpd"] = dataMsg.vpd;
+    obj["moisture"] = dataMsg.moisture;
+    obj["waterCalcLevel"] = dataMsg.waterCalcLevel;
+    obj["isWaterOver"] = dataMsg.isWaterOver;
+    obj["nextMessageTime"] = dataMsg.nextMessageTime;
+    obj["isActuated"] = dataMsg.isActuated;
+    obj["errCode"] = dataMsg.errCode;
+    obj["isFire"] = dataMsg.isFire;
+
     String payload;
-    payload.reserve(256);
-    payload += '{';
-    payload += "\"temp\":";             payload += String(dataMsg.temp, 2);
-    payload += ",\"hum\":";             payload += String(dataMsg.hum, 2);
-    payload += ",\"vpd\":";             payload += String(dataMsg.vpd, 2);
-    payload += ",\"moisture\":";        payload += String(dataMsg.moisture);
-    payload += ",\"waterCalcLevel\":";  payload += String(dataMsg.waterCalcLevel, 2);
-    payload += ",\"isWaterOver\":";     payload += dataMsg.isWaterOver ? "true" : "false";
-    payload += ",\"nextMessageTime\":"; payload += String(dataMsg.nextMessageTime);
-    payload += ",\"isActuated\":";      payload += dataMsg.isActuated ? "true" : "false";
-    payload += ",\"errCode\":";         payload += String(dataMsg.errCode);
-    payload += ",\"isFire\":";          payload += dataMsg.isFire ? "true" : "false";
-    payload += '}';
+    serializeJson(doc, payload);
     return payload;
 }
 
