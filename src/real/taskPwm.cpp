@@ -7,11 +7,11 @@ static const char* TAG_PWM = "TASK_PWM.CPP";
 void pwmSetup() {
     pinMode(HEATER_PWM_PIN, OUTPUT);
     pinMode(FAN_HEATER_PIN, OUTPUT);
-    pinMode(HUMIF_PWM_PIN, OUTPUT);
+    pinMode(HUMIF_PIN, OUTPUT);
     
     digitalWrite(HEATER_PWM_PIN, RELAY_OFF);
     digitalWrite(FAN_HEATER_PIN, RELAY_OFF);
-    digitalWrite(HUMIF_PWM_PIN, RELAY_OFF);
+    digitalWrite(HUMIF_PIN, RELAY_OFF);
     ESP_LOGI(TAG_PWM, "pwmSetup: pin riscaldatore, ventola riscaldatore e umidificatore DISATTIVATI (ALTI)");
 }
 

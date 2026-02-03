@@ -11,7 +11,7 @@ constexpr static const char* TASKS_CPP_COMMS_TAG = "TASK_COMMS.CPP";
 
 extern EventGroupHandle_t syncBits;
 QueueHandle_t dataQueue = nullptr;
-RTC_DATA_ATTR CmdMessage g_rtcCmdMessage;
+RTC_DATA_ATTR CmdMessage g_rtcCmdMessage; //comandi persistenti fra deep sleep anche se non si connette
 
 // --- MQTT command context (owned by taskComms) ---
 struct MqttCmdContext {
@@ -24,9 +24,12 @@ static MqttCmdContext* g_cmdContext = nullptr; // set by taskComms when running
 static bool parseBoolValue(const String &src, int valueStart, bool &out);
 static bool parseBoolField(const String &json, const char *key, bool &out);
 static bool parseCmdMessageJson(const String &json, CmdMessage &cmdOut);
+static String buildGardenMessageJson(const GardenMessage &dataMsg);
+
 static void mqttCallback(char *topic, byte *payload, unsigned int length);
 static bool ensureWifiConnected();
 static bool ensureMqttConnected(WiFiClientSecure &espClient, PubSubClient &mqttClient);
+
 
 // --- TASK B: COMMUNICATIONS (Core 0) ---
 void taskComms(void *pvParameters) {
@@ -132,23 +135,43 @@ void taskComms(void *pvParameters) {
                 // Due cicli prima e dopo (GardenMessage + eventuale CameraFrame)
                 for (int i = 0; i < 2; ++i) {
                         GardenMessage dataMsg{};
-                        if (xQueueReceive(dataQueue, &dataMsg, pdMS_TO_TICKS(60000)) != pdTRUE) {
+                        if (xQueueReceive(dataQueue, &dataMsg, pdMS_TO_TICKS(180000)) != pdTRUE) {
                             ESP_LOGE(TASKS_CPP_COMMS_TAG,
                                     "Timeout in attesa del GardenMessage %d da Mango", i);
                             break;
                         }
-                        
-                        if(effectiveCmd.CmdPhotoReq){
-                            CameraFrame  frame{};    
+
+                        // Per ora tralasciamo la foto, ma lasciamo l'hook
+                        if (effectiveCmd.CmdPhotoReq) {
+                            // CameraFrame frame{}; // TODO: gestire cattura e upload foto
                         }
-                        
-                        //TODO: Costruire mqtt e inviare foto in base a isActuated
-                        if (!dataMsg.isActuated) {
-                            ESP_LOGI(TASKS_CPP_COMMS_TAG,
-                                    "dati e foto PRIMA irrigazione (TODO: upload Firebase)");
+
+                        // Costruzione JSON dei dati letti da Mango
+                        String payload = buildGardenMessageJson(dataMsg);
+
+                        if (!mqttClient.connected()) {
+                            // Prova a riconnettere rapidamente; se fallisce, esci dal loop
+                            if (!ensureMqttConnected(espClient, mqttClient)) {
+                                ESP_LOGE(TASKS_CPP_COMMS_TAG,
+                                         "MQTT disconnesso durante publish dati Mango, abort.");
+                                break;
+                            }
+                        }
+
+                        bool pubOk = mqttClient.publish(TOPIC_PUB, payload.c_str(), true);
+
+                        if (!pubOk) {
+                            ESP_LOGE(TASKS_CPP_COMMS_TAG,
+                                     "Errore publish GardenMessage (isActuated=%d)",
+                                     static_cast<int>(dataMsg.isActuated));
                         } else {
-                            ESP_LOGI(TASKS_CPP_COMMS_TAG,
-                                    "Dati e foto da mango DOPO irrigazione (TODO: upload Firebase)");
+                            if (!dataMsg.isActuated) {
+                                ESP_LOGI(TASKS_CPP_COMMS_TAG,
+                                         "Dati PRIMA irrigazione pubblicati su MQTT");
+                            } else {
+                                ESP_LOGI(TASKS_CPP_COMMS_TAG,
+                                         "Dati DOPO irrigazione pubblicati su MQTT");
+                            }
                         }
                 }
 
@@ -238,6 +261,25 @@ static bool parseCmdMessageJson(const String &json, CmdMessage &cmdOut) {
 
     cmdOut = tmp;
     return true;
+}
+
+// Costruisce il JSON MQTT a partire da un GardenMessage
+static String buildGardenMessageJson(const GardenMessage &dataMsg) {
+    String payload;
+    payload.reserve(256);
+    payload += '{';
+    payload += "\"temp\":";             payload += String(dataMsg.temp, 2);
+    payload += ",\"hum\":";             payload += String(dataMsg.hum, 2);
+    payload += ",\"vpd\":";             payload += String(dataMsg.vpd, 2);
+    payload += ",\"moisture\":";        payload += String(dataMsg.moisture);
+    payload += ",\"waterCalcLevel\":";  payload += String(dataMsg.waterCalcLevel, 2);
+    payload += ",\"isWaterOver\":";     payload += dataMsg.isWaterOver ? "true" : "false";
+    payload += ",\"nextMessageTime\":"; payload += String(dataMsg.nextMessageTime);
+    payload += ",\"isActuated\":";      payload += dataMsg.isActuated ? "true" : "false";
+    payload += ",\"errCode\":";         payload += String(dataMsg.errCode);
+    payload += ",\"isFire\":";          payload += dataMsg.isFire ? "true" : "false";
+    payload += '}';
+    return payload;
 }
 
 // --- MQTT incoming message callback ---

@@ -1,4 +1,4 @@
-constexpr static const char* TASKS_CPP_MANGO_TAG = "PROPORTIONAL.CPP";
+constexpr static const char* TAG_PROPORTIONAL_CPP = "PROPORTIONAL.CPP";
 #include <Arduino.h>
 #include "pins.h"
 #include "common_hw.h"
@@ -19,7 +19,7 @@ void proportional_actuation(GardenMessage* msg) {
         // Clamp to safety limit
         if (heat_duration > MAX_HEAT_TIME_MS) heat_duration = MAX_HEAT_TIME_MS;
 
-        ESP_LOGI(TASKS_CPP_MANGO_TAG, "Heating: Error %.2fC -> %ld ms", error_temp, heat_duration);
+        ESP_LOGI(TAG_PROPORTIONAL_CPP, "Heating: Error %.2fC -> %ld s", error_temp, heat_duration / 1000);
 
         digitalWrite(FAN_HEATER_PIN, RELAY_ON); 
         PWM_HEATER_POW = 100;
@@ -32,7 +32,7 @@ void proportional_actuation(GardenMessage* msg) {
     } 
     else if (msg->temp > (TARGET_TEMP_DAY + HYSTERESIS_TMP)) {
         // Venting logic (Bang-Bang)
-        ESP_LOGW(TASKS_CPP_MANGO_TAG, "Temp High. Venting.");
+        ESP_LOGW(TAG_PROPORTIONAL_CPP, "Temp High. Venting.");
         setDevice(FAN_EXT_P1, RELAY_ON);
         vTaskDelay(pdMS_TO_TICKS(FIXED_VENTING_TIME_MS)); 
         setDevice(FAN_EXT_P1, RELAY_OFF);
@@ -52,7 +52,7 @@ void proportional_actuation(GardenMessage* msg) {
         // Safety Clamp
         if (mist_duration > MAX_MIST_TIME_MS) mist_duration = MAX_MIST_TIME_MS;
 
-        ESP_LOGI(TASKS_CPP_MANGO_TAG, "Air Dry (VPD %.2f). Misting for %ld ms", msg->vpd, mist_duration);
+        ESP_LOGI(TAG_PROPORTIONAL_CPP, "Air Dry (VPD %.2f). Misting for %ld ms", msg->vpd, mist_duration);
 
         digitalWrite(HUMIF_PIN,RELAY_ON);
         
@@ -70,7 +70,7 @@ void proportional_actuation(GardenMessage* msg) {
     // High Humidity Check (Low VPD)
     else if (msg->vpd < 0.4) {
         // 0.4 kPa is "Swampy". Risk of Mold.
-        ESP_LOGW(TASKS_CPP_MANGO_TAG, "VPD Low (Swampy). Pulse Venting.");
+        ESP_LOGW(TAG_PROPORTIONAL_CPP, "VPD Low (Swampy). Pulse Venting.");
         setDevice(FAN_EXT_P1, RELAY_ON);
         vTaskDelay(pdMS_TO_TICKS(FIXED_HUM_EXT_TIME_MS)); // Short burst to exchange air
         setDevice(FAN_EXT_P1, RELAY_OFF);
@@ -79,12 +79,12 @@ void proportional_actuation(GardenMessage* msg) {
 
     // --- PHASE 3: WATERING ---
     if (!msg->isWaterOver && msg->moisture < THRESH_SOIL_DRY) {
-        ESP_LOGI(TASKS_CPP_MANGO_TAG, "Watering Pulse.");
+        ESP_LOGI(TAG_PROPORTIONAL_CPP, "Watering Pulse.");
         setDevice(PUMP_P0, RELAY_ON);
         vTaskDelay(pdMS_TO_TICKS(PUMP_DURATION_MS));
         setDevice(PUMP_P0, RELAY_OFF);
-        updateCalcWaterLevel(msg->waterCalcLevel, PUMP_DURATION_MS);
+        updateCalcWaterLevel(msg->waterCalcLevel, PUMP_DURATION_MS / 1000);
     }else if(msg->isWaterOver){
-        ESP_LOGE(TASKS_CPP_MANGO_TAG, "Water tank depleted! Impossible to water plants!");
+        ESP_LOGE(TAG_PROPORTIONAL_CPP, "Water tank depleted! Impossible to water plants!");
     }
 }
