@@ -15,15 +15,12 @@ constexpr static const char* MAIN_CPP_TAG = "MAIN.CPP/SETUP";
 #include "deep_sleep.h"
 
 // Globals per rtos accessibili a tutti
-QueueHandle_t dataQueue;
 EventGroupHandle_t syncBits;
 
 TaskHandle_t handleMango = NULL;
 TaskHandle_t handleComms = NULL;
 TaskHandle_t handlePWM = NULL;
 
-// Ultimo comando ricevuto, persistente tra deep sleep
-RTC_NOINIT_ATTR CmdMessage g_rtcCmdMessage;
 
 //ISR, flag per fuoco
 volatile RTC_NOINIT_ATTR bool fire_reboot_triggered;
@@ -51,13 +48,9 @@ void setup() {
 
     pwmSetup(); //sempre impostiamo i pin del riscaldatore spenti (RELAY_OFF) per sicurezza come prima cosa e inizializziamo i pin
 
-    // Inizializzazioni variabili RTC al primo avvio
+    // Inizializzazioni variabile RTC fuoco al primo avvio
     if (esp_reset_reason() == ESP_RST_POWERON) {
         fire_reboot_triggered = false;
-        // Default command: nessuna foto, eco ON, stop OFF
-        g_rtcCmdMessage.CmdPhotoReq = false;
-        g_rtcCmdMessage.CmdModeEco  = true;
-        g_rtcCmdMessage.CmdStop     = false;
         ESP_LOGI(MAIN_CPP_TAG, "Cold Boot. System Clean.");
     }
     
@@ -71,7 +64,7 @@ void setup() {
     }
     
     
-    //impostiamo pin acuqa, fuoco e ingresso analog (moisture) e mettiamo l'interrupt che setta flag reboot fuoco durante la fase "da sveglio"
+    //impostiamo pin acuqa, fuoco con interrupt, ingresso analog (moisture) e facciamo partire il pwm a 0
     rtc_gpio_hold_dis((gpio_num_t)WAKE_PIN); //sblocca il pin che era stato attaccato all'rtc deep sleep per accesso durante la veglia
     pinMode(WAKE_PIN, INPUT_PULLDOWN);
     attachInterrupt(digitalPinToInterrupt(WAKE_PIN), fire_isr, RISING);
@@ -80,14 +73,15 @@ void setup() {
 
     i2c_setup(true);
     camera_init();
+    xTaskCreatePinnedToCore(taskPWM,"task Heater PWM",2048,(void*)HEATER_PWM_PIN,2,&handlePWM,1); //priorità leggermente più alta per il pwm
+
 
     
     // 2. Create RTOS Objects
-    dataQueue = xQueueCreate(5, sizeof(GardenMessage));
     syncBits = xEventGroupCreate();
 
     // 3. Launch Workers
-    xTaskCreatePinnedToCore(taskComms, "Comms", 8192, NULL, 1, NULL, 0);
+    xTaskCreatePinnedToCore(taskComms, "Comms", 8192, NULL, 1, &handleComms, 0);
     
 
     ESP_LOGI(MAIN_CPP_TAG,"Task creation called!");
@@ -131,7 +125,7 @@ void execute_fire_protocol() {
 
     // Safety: Kill relays immediately
     digitalWrite(HEATER_PWM_PIN,RELAY_OFF);
-    digitalWrite(HUMIF_PWM_PIN,RELAY_OFF);
+    digitalWrite(HUMIF_PIN,RELAY_OFF);
     digitalWrite(FAN_HEATER_PIN,RELAY_OFF);
     i2c_setup(false); //non abbiamo bisogno dei sensori!
     resetIOExpander();
@@ -142,7 +136,7 @@ void execute_fire_protocol() {
     fireEspClient.setInsecure(); // Skip certs for speed
     fireMqttClient.setServer(MQTT_BROKER, MQTT_PORT);
 
-    String clientId = "ESP32-FIRE-" + String(random(0xffff), HEX);
+    String clientId = "ESP32-SERRAPP-FIRE";
     long lastPub = 0;
 
     // --- END GAME LOOP (Infinite) ---

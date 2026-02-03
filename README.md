@@ -74,9 +74,9 @@ Gli stati `RELAY_ON` e `RELAY_OFF` sono definiti in `pins.h` dato che vanno usat
 
 ### Task main
 La task principale, nel setup di `src/main.cpp`.
-- Inizializza e configura l'hardware e l'interfaccia hardware, spawna la task comms e finisce con il deep sleep.
+- Inizializza e configura l'hardware e l'interfaccia hardware, inclusa la taskPWM lenta che sarà usata da mango semplicemente variando la potenza con `PWM_HEATER_POW`. Spawna la task comms e finisce con il deep sleep.
 - Gestisce l'emergenza del fuoco tramite una flag persistente, rilevato sia durante il deep sleep sia durante la 'veglia' tramite isr, rebootando l'esp. in ciascun caso non crea nessun altra task.
-- Vengono esposti a tutti per sicurezza, tramite l'header, variabili importanti quali quelle di rtos, anche se vengono usate/ inizializzate dalle altre task 
+- Vengono esposti a tutti per sicurezza e per sviluppo, tramite l'header, variabili importanti quali quelle di rtos, anche venissero usate/ inizializzate dalle altre task 
 
 ### Task comms
 - La task si connette al broker Mqtt sopra WiFi e sovrascrive il CmdMessage di default salvato in RTC e definito e inizializzato in `src/main.cpp`. Questo permette al tutto di continuare a funzionare anche in caso di mancata connessione, poi la task decide come proseguire, creando la taskMango con gli opportuni parametri della richiesta foto e della modalità _eco_ con cicli di deep sleep oppure _precision_ costantemente attiva
@@ -84,7 +84,7 @@ La task principale, nel setup di `src/main.cpp`.
 - DA IMPLEMENTARE la task si occupa anche di mandare la foto scattata da taskMango mentre taskMango continua a lavorare alla serra
 
 ### Task mango
-DA IMPLEMENTARE
+Si occupa del ciclo di vita "fisico" della serra. In modalità **eco** legge i sensori (temperatura, umidità aria e suolo, livello acqua), calcola in modo proporzionale i tempi di attuazione per riscaldatore, ventole, umidificatore e pompa, aggiorna lo stato interno (livello stimato del serbatoio) e invia due snapshot dei dati a `taskComms`: uno prima dell'eventuale irrigazione e uno dopo. In base ai tempi calcolati restituisce anche una stima del tempo prima del prossimo ciclo, che viene pubblicata verso il broker MQTT come `nextMessageTime`.
 
 ### Deep sleep
 La funzione `deep_sleep_setup()` viene chiamata prima di avviare lo sleep nel setup di `src/main.cpp` per impostare correttamente il tempo di sleep

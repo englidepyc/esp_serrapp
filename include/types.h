@@ -8,7 +8,7 @@ struct GardenMessage {
     int moisture;
     float waterCalcLevel;       // "m"
     bool isWaterOver;      // "w"  
-    int nextMessageTime; //in minutes
+    int nextMessageTime; // in seconds
     bool isActuated;    
     
     int errCode;       // "err"
@@ -21,6 +21,6 @@ struct GardenMessage {
 
 struct CmdMessage {
     bool CmdPhotoReq;
-    bool CmdModeEco;
+    bool CmdModePrecision;
     bool CmdStop;
 };
