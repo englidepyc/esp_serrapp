@@ -140,7 +140,7 @@ void taskComms(void *pvParameters) {
                 // Due cicli prima e dopo (GardenMessage + eventuale CameraFrame)
                 for (int i = 0; i < 2; ++i) {
                         GardenMessage dataMsg{};
-                        if (xQueueReceive(dataQueue, &dataMsg, pdMS_TO_TICKS(5000)) != pdTRUE) {
+                        if (xQueueReceive(dataQueue, &dataMsg, pdMS_TO_TICKS(60000)) != pdTRUE) {
                             ESP_LOGE(TASKS_CPP_COMMS_TAG,
                                     "Timeout in attesa del GardenMessage %d da Mango", i);
                             break;
@@ -148,7 +148,7 @@ void taskComms(void *pvParameters) {
                         
                         if(effectiveCmd.CmdPhotoReq){
                             CameraFrame  frame{};
-                            if (xQueueReceive(frameQueue, &frame, pdMS_TO_TICKS(5000)) != pdTRUE) {
+                            if (xQueueReceive(frameQueue, &frame, pdMS_TO_TICKS(60000)) != pdTRUE) {
                             ESP_LOGE(TASKS_CPP_COMMS_TAG,
                                     "Timeout in attesa del frame %d da Mango", i);
                             break;

@@ -6,6 +6,7 @@ extern const char* TASKS_CPP_MANGO_TAG = "TASK_MANGO.CPP";
 #include "control/proportional.h"
 #include "taskComms.h"
 #include "taskMango.h"
+#include "main.h"
 
 RTC_DATA_ATTR float currentWaterCalcLevel = 100.0f;
 
@@ -32,7 +33,13 @@ void taskMango(void *pvParameters) {
 
 
         //**PRIMA**
-        msg.isActuated = false;      
+        msg.isActuated = false;
+        
+        msg.isWaterOver = !(digitalRead(FLOAT_SWITCH_PIN)); //logica negata
+        msg.isWaterOver ? currentWaterCalcLevel = 0.0 : 1;                
+        temp_hum_scan_vpd(msg.hum, msg.temp, msg.vpd);
+        msg.moisture = readMoisture_scan();
+
         xQueueSend(dataQueue, &msg, pdMS_TO_TICKS(100));  
         
         if(config.doPhoto){
@@ -43,13 +50,11 @@ void taskMango(void *pvParameters) {
  
 
             //***ATTUAZIONE***/
-            msg.isWaterOver = !(digitalRead(FLOAT_SWITCH_PIN)); //logica negata    
-            temp_hum_scan_vpd(msg.hum, msg.temp, msg.vpd);
-            msg.moisture = readMoisture_scan();
-            msg.waterCalcLevel = 50; //%
+
 
             ESP_LOGI(TASKS_CPP_MANGO_TAG, "Scan Result -> T:%.1f H:%.1f VPD:%.2f Soil:%d%% (fixed) Tank:%.1f", 
                 msg.temp, msg.hum, msg.vpd, msg.moisture, msg.waterCalcLevel);
+            
             proportional_actuation(&msg);
 
 
@@ -57,6 +62,12 @@ void taskMango(void *pvParameters) {
 
         //**DOPO**
         msg.isActuated = true;
+        
+        msg.isWaterOver = !(digitalRead(FLOAT_SWITCH_PIN)); //logica negata
+        msg.isWaterOver ? currentWaterCalcLevel = 0.0 : 1;                
+        temp_hum_scan_vpd(msg.hum, msg.temp, msg.vpd);
+        msg.moisture = readMoisture_scan();
+
         xQueueSend(dataQueue, &msg, pdMS_TO_TICKS(100));
         
         if(config.doPhoto){
@@ -64,29 +75,6 @@ void taskMango(void *pvParameters) {
             xQueueSend(frameQueue, &afterFrame, pdMS_TO_TICKS(100));
         }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     
     
     

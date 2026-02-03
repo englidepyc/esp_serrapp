@@ -15,6 +15,7 @@ void pwmSetup() {
     ESP_LOGI(TAG_PWM, "pwmSetup: pin riscaldatore, ventola riscaldatore e umidificatore DISATTIVATI (ALTI)");
 }
 
+//pwm con risoluzione e finestra temporale in ms specificata nell'header, che applica pwm lento a un pin 
 void taskPWM(void *pvParameters) {
     // Estrai il pin dai parametri
     int pin = (int)(intptr_t)pvParameters;
@@ -22,13 +23,13 @@ void taskPWM(void *pvParameters) {
     digitalWrite(pin, RELAY_OFF);
     
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t xFrequency = pdMS_TO_TICKS(10);
+    const TickType_t xFrequency = pdMS_TO_TICKS(PWM_TIME_RESOLUTION);
 
     for(;;) {
-        unsigned long msInWindow = millis() % 1000;
-        int onTime = constrain(PWM_HEATER_POW, 0, 100) * 10; 
+        unsigned long msInWindow = millis() % PWM_TIME_WINDOW;
+        int onTime = constrain(PWM_HEATER_POW, 0, 100) * PWM_TIME_RESOLUTION; 
 
-        bool shouldBeOn = (PWM_HEATER_POW > 0) && (msInWindow < onTime);
+        bool shouldBeOn = msInWindow < onTime;
         digitalWrite(pin, shouldBeOn ? RELAY_ON : RELAY_OFF);
 
         vTaskDelayUntil(&xLastWakeTime, xFrequency);

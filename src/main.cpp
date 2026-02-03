@@ -70,7 +70,7 @@ void setup() {
     }
     
     
-    //impostiamo pin acuqa, fuoco e ingresso analog (moisture) e mettiamo l'interrupt che setta flag reboot fuoco durante la fase "da sveglio"
+    //impostiamo pin acuqa, fuoco con interrupt, ingresso analog (moisture) e facciamo partire il pwm a 0
     rtc_gpio_hold_dis((gpio_num_t)WAKE_PIN); //sblocca il pin che era stato attaccato all'rtc deep sleep per accesso durante la veglia
     pinMode(WAKE_PIN, INPUT_PULLDOWN);
     attachInterrupt(digitalPinToInterrupt(WAKE_PIN), fire_isr, RISING);
@@ -79,13 +79,15 @@ void setup() {
 
     i2c_setup(true);
     camera_init();
+    xTaskCreatePinnedToCore(taskPWM,"task Heater PWM",2048,(void*)HEATER_PWM_PIN,2,&handlePWM,1); //priorità leggermente più alta per il pwm
+
 
     
     // 2. Create RTOS Objects
     syncBits = xEventGroupCreate();
 
     // 3. Launch Workers
-    xTaskCreatePinnedToCore(taskComms, "Comms", 8192, NULL, 1, NULL, 0);
+    xTaskCreatePinnedToCore(taskComms, "Comms", 8192, NULL, 1, &handleComms, 0);
     
 
     ESP_LOGI(MAIN_CPP_TAG,"Task creation called!");
@@ -129,7 +131,7 @@ void execute_fire_protocol() {
 
     // Safety: Kill relays immediately
     digitalWrite(HEATER_PWM_PIN,RELAY_OFF);
-    digitalWrite(HUMIF_PWM_PIN,RELAY_OFF);
+    digitalWrite(HUMIF_PIN,RELAY_OFF);
     digitalWrite(FAN_HEATER_PIN,RELAY_OFF);
     i2c_setup(false); //non abbiamo bisogno dei sensori!
     resetIOExpander();
