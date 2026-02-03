@@ -26,4 +26,6 @@ const int   PUMP_DURATION_MS      = 5000; // 5 Seconds shot glass
 const float HYSTERESIS_VPD     = 0.2;   // Only mist if VPD > Target + 0.2
 const float HYSTERESIS_TMP     = 2;
 
+
+long proportional_calculate_total_time(GardenMessage* msg);
 void proportional_actuation(GardenMessage* msg);

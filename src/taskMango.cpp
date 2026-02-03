@@ -12,17 +12,16 @@ RTC_DATA_ATTR float currentWaterCalcLevel = 100.0;
 
 // --- TASK A: GARDEN LOGIC (Core 1) ---
 void taskMango(void *pvParameters) {   
+    GardenMessage msg {};
+    
     // pvParameters viene usato solo come flag: non serve heap
     bool isEcoMode = (pvParameters != nullptr);
-
-    GardenMessage msg{};
     msg.errCode = 0;
 
 
     
     if (isEcoMode) {
     //******* MODALITA' ECO TPC ********
-
 
         //**PRIMA**
         msg.isActuated = false;
@@ -36,6 +35,11 @@ void taskMango(void *pvParameters) {
         msg.waterCalcLevel = currentWaterCalcLevel;
         temp_hum_scan_vpd(msg.hum, msg.temp, msg.vpd);
         msg.moisture = readMoisture_scan();
+
+        // Calcola il tempo totale di attuazione (ms) e traduci in secondi per nextMessageTime
+        long totalMs = proportional_calculate_total_time(&msg);
+        int totalS = (totalMs + 999) / 1000; // arrotonda per eccesso
+        msg.nextMessageTime = totalS;
 
         xQueueSend(dataQueue, &msg, pdMS_TO_TICKS(100));  
  
@@ -63,21 +67,9 @@ void taskMango(void *pvParameters) {
         msg.waterCalcLevel = currentWaterCalcLevel;
         temp_hum_scan_vpd(msg.hum, msg.temp, msg.vpd);
         msg.moisture = readMoisture_scan();
-
+        msg.nextMessageTime = SLEEP_FIXED_DURATION;
         xQueueSend(dataQueue, &msg, pdMS_TO_TICKS(100));
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     
     
     
