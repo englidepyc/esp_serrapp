@@ -11,7 +11,10 @@ constexpr static const char* TASKS_CPP_COMMS_TAG = "TASK_COMMS.CPP";
 #include "taskComms.h"
 
 extern EventGroupHandle_t syncBits;
+
 QueueHandle_t dataQueue = nullptr;
+volatile bool live_mode = false;
+
 RTC_DATA_ATTR CmdMessage g_rtcCmdMessage; //comandi persistenti fra deep sleep anche se non si connette
 
 // --- MQTT command context (owned by taskComms) ---
@@ -175,31 +178,53 @@ void taskComms(void *pvParameters) {
                     vTaskDelay(pdMS_TO_TICKS(10));
                 }
 
-                if(/*e' stato ricevuto un nuovo messaggio (si può vedere da hasLatestCmd)*/){
+                if(cmdContext.hasLatestCmd == true){
                     
-                    
-                    if(/*il messaggio è CmdPhotoReq = 1, CmdModePrecision = 1 CmdStop = 0*/){
-                        // Setta (produci) una flag live_mode, consumata da taskMango. taskComms si limita a produrre, taskMango si limita a leggere, forse si può fare semplicemente una variabile che viene acceduta da entrambi
+                    /*il messaggio è CmdPhotoReq = 1, CmdModePrecision = 1 CmdStop = 0*/
+                    if (cmdContext.latestCmd.CmdModePrecision && !cmdContext.latestCmd.CmdStop && cmdContext.latestCmd.CmdPhotoReq){
+                        live_mode = true;
                         
-                        while(/*continua ad essere ricevuto un nuovo messaggio *CmdPhotoReq = 1, CmdModePrecision = 1 CmdStop = 0*/){
-                            
-                            // Mantieni la connessione MQTT viva per un po' per ricevere i comandi JSON
-                            const unsigned long listenWindowMs = 5000; // ascolta per 10 secondi
-                            unsigned long start = millis();
-                            while (millis() - start < listenWindowMs) {
-                                if (!mqttClient.connected()) {
-                                // Prova a riconnettere rapidamente; se fallisce, esci dal loop
-                                    if (!ensureMqttConnected(espClient, mqttClient)) {
-                                        break;
-                                    }
-                                }
-                                mqttClient.loop();
-                                vTaskDelay(pdMS_TO_TICKS(10)); 
-                            }
-                        
-                            //Ricevi GardenMessage da taskMango e Pubblicalo json su MQTT
-                        
+                while(cmdContext.hasLatestCmd == true){
+                    /***LIVE MODE***/
+                    /*//TODO Regolare il tempo per essere compatibile col PID*/
+                    cmdContext.hasLatestCmd = false;
+
+                    xQueueReceive(dataQueue, &dataMsg, pdMS_TO_TICKS(100));
+
+                    // Costruzione JSON dei dati letti da Mango (riuso di buildGardenMessageJson)
+                    String payload = buildGardenMessageJson(dataMsg);
+
+                    if (!mqttClient.connected()) {
+                        // Prova a riconnettere rapidamente; se fallisce, salta questo giro
+                        if (!ensureMqttConnected(espClient, mqttClient)) {
+                            ESP_LOGE(TASKS_CPP_COMMS_TAG,
+                                     "MQTT disconnesso durante publish dati Mango (precision), skip.");
+                            continue;
                         }
+                    }
+
+                    bool pubOk = mqttClient.publish(TOPIC_PUB, payload.c_str(), true);
+
+                    // Mantieni la connessione MQTT viva per un po' per ricevere i comandi JSON
+                    const unsigned long listenWindowMs = 5000; // ascolta per 5 secondi, calibrare, potrebbe esserci lag dal telefono
+                    unsigned long start = millis();
+                    while (millis() - start < listenWindowMs) {
+                        if (!mqttClient.connected()) {
+                        // Prova a riconnettere rapidamente; se fallisce, esci dal loop
+                            if (!ensureMqttConnected(espClient, mqttClient)) {
+                                break;
+                            }
+                        }
+                        mqttClient.loop();
+                        vTaskDelay(pdMS_TO_TICKS(10)); 
+                    }                
+                
+                
+                
+                }// FINE LIVE MODE
+
+                       
+            }
 
                     }
                     
@@ -387,11 +412,11 @@ static void mqttCallback(char *topic, byte *payload, unsigned int length) {
              topic,
              message.c_str());
 
-    if (g_cmdContext == nullptr) {
+/*     if (g_cmdContext == nullptr) {
         ESP_LOGW(TASKS_CPP_COMMS_TAG,
                  "CmdContext non inizializzato, messaggio scartato");
         return;
-    }
+    } */
 
     CmdMessage parsed{};
     if (parseCmdMessageJson(message, parsed)) {

@@ -6,5 +6,6 @@
 #include "types.h"
 #include "camera.h"
 
-// Code di comunicazione tra Mango e Comms
+//Comunicazione tra Mango e Comms
 extern QueueHandle_t dataQueue;   // GardenMessage
+extern volatile bool live_mode;
