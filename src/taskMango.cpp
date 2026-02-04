@@ -74,7 +74,25 @@ void taskMango(void *pvParameters) {
     
     
     } else {
+        //*** PRECISION MODE ***/
         ESP_LOGD(TASKS_CPP_MANGO_TAG, "Modalita' PRECISION attivata in taskMango");
+    
+        //setup tempo
+        while(1){
+            //aggiorno tempo
+            //PID_TEMPERATURA
+
+
+
+            if(/*sono passati 10 minuti*/){
+                //Logica misura moisture e irrigazione, ricorda di controllare se l'acqua è finita con logica negata
+                //MANDA messaggio a taskComms che lo invierà MQTT
+            }
+
+            if(/*live_mode*/){
+                //Manda GardenMessage con misurazioni a taskComms magari con un delay di 10 secondi (inferiore al ciclo del pid)
+            }
+        }
     }
 
     

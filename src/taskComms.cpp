@@ -97,19 +97,121 @@ void taskComms(void *pvParameters) {
         //**** Gestione del comando effettivo
         
         if (effectiveCmd.CmdStop) {
-          //*** STOP DETECTED */
+            //*** STOP DETECTED */
             while (1) {
                 ESP_LOGI(TASKS_CPP_COMMS_TAG,
                          "Comando di stop ricevuto, serra sospesa in loop...");
                 vTaskDelay(pdMS_TO_TICKS(1000));
             }
         } else if (effectiveCmd.CmdModePrecision == true) {
-            while (1) {
-                //TODO: *** PRECISION
+            
+            
+            BaseType_t created = xTaskCreatePinnedToCore(
+                taskMango,
+                "Mango",
+                8192,
+                (void*)0, // usa pvParameters come semplice flag eco/non-eco
+                1,
+                &handleMango,
+                1
+            );
+
+            if (created != pdPASS) {
+                ESP_LOGE(TASKS_CPP_COMMS_TAG,
+                         "Errore nella creazione di taskMango (Precision mode)");
+            }else{
+            //*** PRECISION MODE ***
+            while (1) {    
                 ESP_LOGI(TASKS_CPP_COMMS_TAG,
                          "Modalità precision attivata vado in loop, TODO IMPLEMENTARE...");
-                vTaskDelay(pdMS_TO_TICKS(1000));
+
+                
+                
+                if(/*Task mango ha mandato (prodotto) il GardenMessage perché sono passati 10 minuti*/){
+                    //Mandalo json su MQTT
+                }
+                
+                // Mantieni la connessione MQTT viva per un po' per ricevere i comandi JSON
+                const unsigned long listenWindowMs = 10000; // ascolta per 10 secondi
+                unsigned long start = millis();
+                while (millis() - start < listenWindowMs) {
+                    if (!mqttClient.connected()) {
+                        // Prova a riconnettere rapidamente; se fallisce, esci dal loop
+                        if (!ensureMqttConnected(espClient, mqttClient)) {
+                            break;
+                        }
+                    }
+                    mqttClient.loop();
+                    vTaskDelay(pdMS_TO_TICKS(10));
+                }
+
+                if(/*e' stato ricevuto un nuovo messaggio (si può vedere da hasLatestCmd)*/){
+                    
+                    
+                    if(/*il messaggio è CmdPhotoReq = 1, CmdModePrecision = 1 CmdStop = 0*/){
+                        // Setta (produci) una flag live_mode, consumata da taskMango. taskComms si limita a produrre, taskMango si limita a leggere, forse si può fare semplicemente una variabile che viene acceduta da entrambi
+                        
+                        while(/*continua ad essere ricevuto un nuovo messaggio *CmdPhotoReq = 1, CmdModePrecision = 1 CmdStop = 0*/){
+                            
+                            // Mantieni la connessione MQTT viva per un po' per ricevere i comandi JSON
+                            const unsigned long listenWindowMs = 5000; // ascolta per 10 secondi
+                            unsigned long start = millis();
+                            while (millis() - start < listenWindowMs) {
+                                if (!mqttClient.connected()) {
+                                // Prova a riconnettere rapidamente; se fallisce, esci dal loop
+                                    if (!ensureMqttConnected(espClient, mqttClient)) {
+                                        break;
+                                    }
+                                }
+                                mqttClient.loop();
+                                vTaskDelay(pdMS_TO_TICKS(10)); 
+                            }
+                        
+                            //Ricevi GardenMessage da taskMango e Pubblicalo json su MQTT
+                        
+                        }
+
+                    }
+                    
+                    //non è else così funziona anche se siamo usciti dal precedente if perché è cambiato il messaggio
+                    if(/*C'è un NUOVO messaggio che ha CmdModePrecision = 0 e CmdStop = 0*/){
+
+                        //LOGGA "Passo a modalità eco e vado in loop", vai in loop con TaskDelay e implementeremo dopo
+
+                    }
+
+                    
+                    if(/*C'è un NUOVO messaggio che ha e CmdStop = 1*/){
+
+                        //LOGGA "Stop e vado in loop", vai in loop con TaskDelay e implementeremo dopo
+
+                    }
+
+
+                    //Arrivati qui significa che non sono ricevuti ulteriori nuovi messaggi, possiamo settare live_mode falsa e ritornare al while principale
+
+                    
+
+
+                }
+
+                
+                         
+
+
+
+
+
+
+
+
+                    vTaskDelay(pdMS_TO_TICKS(1000));
+                }
             }
+            
+            
+            
+            
         } else if (effectiveCmd.CmdModePrecision == false){
             //*****MODE ECO ******/
             ESP_LOGI(TASKS_CPP_COMMS_TAG,
