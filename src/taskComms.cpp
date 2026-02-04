@@ -20,7 +20,7 @@ struct MqttCmdContext {
     volatile bool hasLatestCmd;
 };
 
-static MqttCmdContext* g_cmdContext = nullptr; // set by taskComms when running
+static MqttCmdContext* g_cmdContext = nullptr; // set by taskComms when running, condiviso da taskComms e callback
 // --- Prototipi funzioni locali ---
 static bool parseCmdMessageJson(const String &json, CmdMessage &cmdOut);
 static String buildGardenMessageJson(const GardenMessage &dataMsg);
@@ -80,6 +80,7 @@ void taskComms(void *pvParameters) {
             // Nuovo comando ricevuto: aggiorna anche la copia persistente in RTC
             g_rtcCmdMessage = cmdContext.latestCmd;
             effectiveCmd    = cmdContext.latestCmd;
+            cmdContext.hasLatestCmd = false;
 
             ESP_LOGI(TASKS_CPP_COMMS_TAG,
                      "Nuovo comando applicato e salvato in RTC -> PhotoReq=%d ModePrecision=%d Stop=%d",
@@ -121,15 +122,44 @@ void taskComms(void *pvParameters) {
                          "Errore nella creazione di taskMango (Precision mode)");
             }else{
             //*** PRECISION MODE ***
+            GardenMessage dataMsg{};
             while (1) {    
                 ESP_LOGI(TASKS_CPP_COMMS_TAG,
                          "Modalità precision attivata vado in loop, TODO IMPLEMENTARE...");
 
                 
-                
-                if(/*Task mango ha mandato (prodotto) il GardenMessage perché sono passati 10 minuti*/){
-                    //Mandalo json su MQTT
+                if (/*Task mango ha mandato (prodotto) il GardenMessage perché sono passati 10 minuti*/
+                    xQueueReceive(dataQueue, &dataMsg, pdMS_TO_TICKS(100)) == pdTRUE) {
+
+                    // Costruzione JSON dei dati letti da Mango (riuso di buildGardenMessageJson)
+                    String payload = buildGardenMessageJson(dataMsg);
+
+                    if (!mqttClient.connected()) {
+                        // Prova a riconnettere rapidamente; se fallisce, salta questo giro
+                        if (!ensureMqttConnected(espClient, mqttClient)) {
+                            ESP_LOGE(TASKS_CPP_COMMS_TAG,
+                                     "MQTT disconnesso durante publish dati Mango (precision), skip.");
+                            continue;
+                        }
+                    }
+
+                    bool pubOk = mqttClient.publish(TOPIC_PUB, payload.c_str(), true);
+
+                    if (!pubOk) {
+                        ESP_LOGE(TASKS_CPP_COMMS_TAG,
+                                 "Errore publish GardenMessage (precision, isActuated=%d)",
+                                 static_cast<int>(dataMsg.isActuated));
+                    } else {
+                        if (!dataMsg.isActuated) {
+                            ESP_LOGI(TASKS_CPP_COMMS_TAG,
+                                     "[PRECISION] Dati PRIMA irrigazione pubblicati su MQTT");
+                        } else {
+                            ESP_LOGI(TASKS_CPP_COMMS_TAG,
+                                     "[PRECISION] Dati DOPO irrigazione pubblicati su MQTT");
+                        }
+                    }
                 }
+                
                 
                 // Mantieni la connessione MQTT viva per un po' per ricevere i comandi JSON
                 const unsigned long listenWindowMs = 10000; // ascolta per 10 secondi
