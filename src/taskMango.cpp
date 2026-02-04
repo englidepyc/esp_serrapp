@@ -86,7 +86,7 @@ void taskMango(void *pvParameters) {
 
             if(/*sono passati 10 minuti*/){
                 //Logica misura moisture e irrigazione, ricorda di controllare se l'acqua è finita con logica negata
-                //MANDA messaggio a taskComms che lo invierà MQTT
+                //MANDA messaggio a taskComms che lo invierà MQTT, setta il feedback isModePrecision = true
             }
 
             if(/*live_mode*/){
