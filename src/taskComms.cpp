@@ -11,7 +11,10 @@ constexpr static const char* TASKS_CPP_COMMS_TAG = "TASK_COMMS.CPP";
 #include "taskComms.h"
 
 extern EventGroupHandle_t syncBits;
+
 QueueHandle_t dataQueue = nullptr;
+volatile bool live_mode = false;
+
 RTC_DATA_ATTR CmdMessage g_rtcCmdMessage; //comandi persistenti fra deep sleep anche se non si connette
 
 // --- MQTT command context (owned by taskComms) ---
@@ -20,15 +23,15 @@ struct MqttCmdContext {
     volatile bool hasLatestCmd;
 };
 
-static MqttCmdContext* g_cmdContext = nullptr; // set by taskComms when running
+static MqttCmdContext* g_cmdContext = nullptr; // set by taskComms when running, condiviso da taskComms e callback
 // --- Prototipi funzioni locali ---
 static bool parseCmdMessageJson(const String &json, CmdMessage &cmdOut);
 static String buildGardenMessageJson(const GardenMessage &dataMsg);
 
+static void listenMqttWindow(PubSubClient &mqttClient, WiFiClientSecure &espClient, unsigned long timeoutMs);
 static void mqttCallback(char *topic, byte *payload, unsigned int length);
 static bool ensureWifiConnected();
 static bool ensureMqttConnected(WiFiClientSecure &espClient, PubSubClient &mqttClient);
-
 
 // --- TASK B: COMMUNICATIONS (Core 0) ---
 void taskComms(void *pvParameters) {
@@ -58,19 +61,8 @@ void taskComms(void *pvParameters) {
             vTaskDelete(nullptr);
         }
 
-        // 4. Mantieni la connessione MQTT viva per un po' per ricevere i comandi JSON
-        const unsigned long listenWindowMs = 10000; // ascolta per 10 secondi
-        unsigned long start = millis();
-        while (millis() - start < listenWindowMs) {
-            if (!mqttClient.connected()) {
-                // Prova a riconnettere rapidamente; se fallisce, esci dal loop
-                if (!ensureMqttConnected(espClient, mqttClient)) {
-                    break;
-                }
-            }
-            mqttClient.loop();
-            vTaskDelay(pdMS_TO_TICKS(10));
-        }
+        //Rimane in ascolto per nuovi comandi MQTT
+        listenMqttWindow(mqttClient, espClient, MQTT_WINDOW_MS);
 
 
         // 4b. Scegli il comando effettivo: nuovo da MQTT o ultimo salvato in RTC
@@ -80,6 +72,7 @@ void taskComms(void *pvParameters) {
             // Nuovo comando ricevuto: aggiorna anche la copia persistente in RTC
             g_rtcCmdMessage = cmdContext.latestCmd;
             effectiveCmd    = cmdContext.latestCmd;
+            cmdContext.hasLatestCmd = false;
 
             ESP_LOGI(TASKS_CPP_COMMS_TAG,
                      "Nuovo comando applicato e salvato in RTC -> PhotoReq=%d ModePrecision=%d Stop=%d",
@@ -97,19 +90,120 @@ void taskComms(void *pvParameters) {
         //**** Gestione del comando effettivo
         
         if (effectiveCmd.CmdStop) {
-          //*** STOP DETECTED */
+            //*** STOP DETECTED */
             while (1) {
                 ESP_LOGI(TASKS_CPP_COMMS_TAG,
                          "Comando di stop ricevuto, serra sospesa in loop...");
                 vTaskDelay(pdMS_TO_TICKS(1000));
             }
         } else if (effectiveCmd.CmdModePrecision == true) {
-            while (1) {
-                //TODO: *** PRECISION
-                ESP_LOGI(TASKS_CPP_COMMS_TAG,
-                         "Modalità precision attivata vado in loop, TODO IMPLEMENTARE...");
-                vTaskDelay(pdMS_TO_TICKS(1000));
-            }
+            
+            
+            BaseType_t created = xTaskCreatePinnedToCore(
+                taskMango,
+                "Mango",
+                8192,
+                (void*)0, // usa pvParameters come semplice flag eco/non-eco
+                1,
+                &handleMango,
+                1
+            );
+
+            if (created != pdPASS) {
+                ESP_LOGE(TASKS_CPP_COMMS_TAG,
+                         "Errore nella creazione di taskMango (Precision mode)");
+            }else{
+                //*** PRECISION MODE (rimani ad ascoltare mqtt per passare in liveMode oppure rebootare in stop o eco)***
+                GardenMessage dataMsg{};
+                while (1) {    
+                    ESP_LOGI(TASKS_CPP_COMMS_TAG,
+                            "Modalità precision attivata vado in loop, TODO IMPLEMENTARE...");
+
+                    
+                    if (/*Task mango ha mandato (prodotto) il GardenMessage perché sono passati 10 minuti*/
+                        xQueueReceive(dataQueue, &dataMsg, pdMS_TO_TICKS(100)) == pdTRUE) {
+
+                        // Costruzione JSON dei dati letti da Mango (riuso di buildGardenMessageJson)
+                        String payload = buildGardenMessageJson(dataMsg);
+
+                        if (!mqttClient.connected()) {
+                            // Prova a riconnettere rapidamente; se fallisce, salta questo giro
+                            if (!ensureMqttConnected(espClient, mqttClient)) {
+                                ESP_LOGE(TASKS_CPP_COMMS_TAG,
+                                        "MQTT disconnesso durante publish dati Mango (precision), skip.");
+                                continue;
+                            }
+                        }
+
+                        bool pubOk = mqttClient.publish(TOPIC_PUB, payload.c_str(), true);
+
+                        if (!pubOk) {
+                            ESP_LOGE(TASKS_CPP_COMMS_TAG,
+                                    "Errore publish GardenMessage (precision, isActuated=%d)",
+                                    static_cast<int>(dataMsg.isActuated));
+                        } 
+                    }
+                    
+                    
+                    //Rimane in ascolto di nuovi messaggi MQTT
+                    listenMqttWindow(mqttClient, espClient, MQTT_WINDOW_MS);
+
+                    if(cmdContext.hasLatestCmd == true){
+                            
+                        while (cmdContext.hasLatestCmd && cmdContext.latestCmd.CmdModePrecision && !cmdContext.latestCmd.CmdStop && cmdContext.latestCmd.CmdPhotoReq){
+                            /***LIVE MODE***/
+                            //TODO Regolare i tempi per essere compatibile col ciclo PID di taskMango o usare eventGroup
+                            live_mode = true;
+                            cmdContext.hasLatestCmd = false;
+
+                            xQueueReceive(dataQueue, &dataMsg, pdMS_TO_TICKS(WAIT_MANGO_MSG_LIVE_MS));
+
+                            // Costruzione JSON dei dati letti da Mango (riuso di buildGardenMessageJson)
+                            String payload = buildGardenMessageJson(dataMsg);
+
+                            if (!mqttClient.connected()) {
+                                // Prova a riconnettere rapidamente; se fallisce, salta questo giro
+                                if (!ensureMqttConnected(espClient, mqttClient)) {
+                                    ESP_LOGE(TASKS_CPP_COMMS_TAG,
+                                            "MQTT disconnesso durante publish dati Mango (precision), skip.");
+                                    continue;
+                                }
+                            }
+
+                            bool pubOk = mqttClient.publish(TOPIC_PUB, payload.c_str(), true);
+
+                            //Rimane in ascolto di nuovi messaggi MQTT
+                            listenMqttWindow(mqttClient, espClient, MQTT_WINDOW_MS);                                       
+                        } //live_mode
+
+                        live_mode = false;
+
+                        //non è else così funziona anche se siamo usciti dal precedente if perché è cambiato il messaggio
+                        if(cmdContext.hasLatestCmd && !cmdContext.latestCmd.CmdModePrecision && !cmdContext.latestCmd.CmdStop){
+                        
+                            /*** PASSA A MODALITA' ECO ***/
+                        
+                        }
+
+                        
+                        if(cmdContext.hasLatestCmd && cmdContext.latestCmd.CmdStop){
+
+                            /*** STOP E LOOP***/
+
+                        }
+                    
+                    
+                    
+                    }//has latest_cmd
+                        
+
+                    vTaskDelay(pdMS_TO_TICKS(1000));
+                }//while della precision_mode
+            }//creazione task mango in precision mode
+            
+            
+            
+            
         } else if (effectiveCmd.CmdModePrecision == false){
             //*****MODE ECO ******/
             ESP_LOGI(TASKS_CPP_COMMS_TAG,
@@ -255,11 +349,11 @@ static void mqttCallback(char *topic, byte *payload, unsigned int length) {
              topic,
              message.c_str());
 
-    if (g_cmdContext == nullptr) {
+/*     if (g_cmdContext == nullptr) {
         ESP_LOGW(TASKS_CPP_COMMS_TAG,
                  "CmdContext non inizializzato, messaggio scartato");
         return;
-    }
+    } */
 
     CmdMessage parsed{};
     if (parseCmdMessageJson(message, parsed)) {
@@ -342,4 +436,25 @@ static bool ensureMqttConnected(WiFiClientSecure &espClient, PubSubClient &mqttC
     ESP_LOGE(TASKS_CPP_COMMS_TAG,
              "ERRORE: impossibile connettersi a MQTT.");
     return false;
+}
+
+// --- Funzione privata: ascolta MQTT per N ms, esce se nuovo comando o timeout ---
+static void listenMqttWindow(PubSubClient &mqttClient, WiFiClientSecure &espClient, unsigned long timeoutMs) {
+    unsigned long start = millis();
+    while (millis() - start < timeoutMs) {
+        if (!mqttClient.connected()) {
+            // Prova a riconnettere rapidamente; se fallisce, esci dal loop
+            if (!ensureMqttConnected(espClient, mqttClient)) {
+                break;
+            }
+        }
+        mqttClient.loop();
+
+        // Esce immediatamente se arriva un nuovo comando
+        if (g_cmdContext && g_cmdContext->hasLatestCmd) {
+            break;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
 }
