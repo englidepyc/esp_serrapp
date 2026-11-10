@@ -1,5 +1,8 @@
 examples/
+
+# secret
 include/config.h
+
 .copilotignore
 .copilot-settings.md
 ROADMAP.md
