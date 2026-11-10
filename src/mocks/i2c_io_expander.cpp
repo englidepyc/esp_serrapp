@@ -5,6 +5,8 @@
 
 constexpr static const char* IO_EXP_TAG = "IO_EXPANDER_MOCK";
 
+namespace io_expander {
+
 void updateIOExpander() {
     // Mock: non fa nulla
 }
@@ -31,4 +33,6 @@ void initIOExpander() {
 
 void resetIOExpander(){
     ESP_LOGI(IO_EXP_TAG, "IO Expander resettato (MOCK - nessuna operazione reale)");
+}
+
 }

@@ -4,6 +4,8 @@
 #define ON_R LOW
 #define OFF_R HIGH
 
+namespace shift_register {
+
 enum Device : byte {
    PUMP_Q0     = 0,
    HEATER_Q1   = 1,
@@ -22,3 +24,5 @@ void setDevice(Device dev, bool state);
 void setAmuxChannel(byte channel);
 //debug
 byte readCurrentSrBits();
+
+}

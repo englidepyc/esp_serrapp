@@ -8,6 +8,8 @@ static const char* deviceNames[] = {"PUMP", "HEATER", "HEAT_FAN", "HUMIDIFIER", 
 // Internal mock state of the shift register outputs
 static byte current_sr_bits = 0xFF;
 
+namespace shift_register {
+
 // In the mock, this is a pure no-op for hardware, used only for logging if needed
 void updateShiftRegister() {
    // No real hardware interaction here to keep tests safe
@@ -61,4 +63,6 @@ void initShiftRegister() {
 byte readCurrentSrBits() {
    ESP_LOGD(SHIFT_REGISTER_H_TAG, "current_sr_bits: 0x%02X", current_sr_bits);
    return current_sr_bits;
+}
+
 }

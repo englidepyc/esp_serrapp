@@ -13,6 +13,8 @@ static const char* deviceNames[] = {"PUMP", "EXT_FAN", "AMUX0", "AMUX1", "AMUX2"
 // Poiché i relè sono Active LOW, all'avvio è tutto SPENTO.
 static byte _port_state = 0xFF; 
 
+namespace io_expander {
+
 // Funzione privata per inviare fisicamente i dati via I2C
 void _writePCF(byte data) {
     Wire.beginTransmission(PCF_ADDR);
@@ -89,4 +91,6 @@ void resetIOExpander() {
     updateIOExpander();
     
     ESP_LOGI(IO_EXP_TAG, "IO Expander (PCF8574) inizializzato a 0xFF (Tutto OFF)");
+}
+
 }

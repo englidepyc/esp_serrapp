@@ -6,6 +6,8 @@ static const char* deviceNames[] = {"PUMP", "HEATER", "HEAT_FAN", "HUMIDIFIER", 
 
 static byte current_sr_bits = 0xFF; 
 
+namespace shift_register {
+
 void updateShiftRegister() {
    digitalWrite(LATCH_PIN, LOW);
    shiftOut(DATA_PIN, CLOCK_PIN, MSBFIRST, current_sr_bits);
@@ -68,5 +70,7 @@ void initShiftRegister() {
 byte readCurrentSrBits() {
    ESP_LOGD(SHIFT_REGISTER_H_TAG, "current_sr_bits: 0x%02X", current_sr_bits);
    return current_sr_bits;
+}
+
 }
 

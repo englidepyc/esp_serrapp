@@ -3,11 +3,12 @@ constexpr static const char* TAG = "ANALOG_MOISTURE_READS.CPP";
 #include <Arduino.h>
 #include "pins.h"
 #include "analog_moisture_reads.h"
+#include "shift_register.h"
 #include "i2c_io_expander.h"
 
 int readMoisture_single(uint8_t analog_channel) {
     //scegli il canale dal mux analogico
-    setAmuxChannel(analog_channel);
+    shift_register::setAmuxChannel(analog_channel);
 
     // 1. Leggi il valore analogico grezzo (0-4095 su ESP32)
     int rawValue = analogRead(MOIST_AOUT_PIN);
