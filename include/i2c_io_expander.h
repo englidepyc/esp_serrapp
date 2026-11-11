@@ -8,6 +8,8 @@
 #define PCF_ADDR 0x20
 #define PCF_MUX_CHANNEL 4 
 
+namespace io_expander {
+
 enum Device : byte {
    PUMP_P0     = 0,
    FAN_EXT_P1  = 1,
@@ -24,3 +26,5 @@ void setAllOutputs(bool state);
 void setDevice(Device dev, bool state);
 void setAmuxChannel(byte channel);
 void resetIOExpander();
+
+}

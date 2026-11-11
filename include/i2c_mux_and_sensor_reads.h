@@ -4,7 +4,7 @@
 #include <Adafruit_BMP280.h> // Library for BMP280
 #include "pins.h"
 
-#define I2C_SENSORS_QTY 2 //Temperatura e umidità
+#define I2C_SENSORS_QTY 2 //Temperatura e umidità (+ io_expander if used)
 #define I2C_MUX_ADDRESS 0x70
 #define I2C_SENSOR_READ_DELAY_MS 50 //Delay tra letture sensori per evitare self-heating e stabilizzare canale
 

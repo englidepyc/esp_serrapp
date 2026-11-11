@@ -25,8 +25,9 @@ void i2c_setup(bool enable_sensors = false) {
   Wire.begin(SDA_PIN,SCL_PIN);
 
   //controlla che il mux i2c è ok
-  if (i2c_mux_select_bus(0) != 0) {
-    ESP_LOGW(I2C_TEMP_HUM_READS_H_TAG, "Mux i2c non funziona!");
+  uint8_t mux_error_code = i2c_mux_select_bus(0);
+  if (mux_error_code != 0) {
+    ESP_LOGW(I2C_TEMP_HUM_READS_H_TAG, "Mux i2c non funziona! Codice errore: %u", mux_error_code);
   } else {
     ESP_LOGD(I2C_TEMP_HUM_READS_H_TAG, "Mux i2c OK");
   }
